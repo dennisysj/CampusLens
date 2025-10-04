@@ -1,55 +1,252 @@
 <html>
   <head>
     <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
+    <style>
+      .ui-panel {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        z-index: 100;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 15px;
+        border-radius: 10px;
+        color: white;
+        font-family: Arial, sans-serif;
+      }
+      
+      .ui-button {
+        background: #4CAF50;
+        border: none;
+        color: white;
+        padding: 10px 15px;
+        margin: 5px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      
+      .ui-button:hover {
+        background: #45a049;
+      }
+      
+      .ui-button.active {
+        background: #2196F3;
+      }
+      
+      .ui-button.delete {
+        background: #f44336;
+      }
+      
+      .ui-button.delete:hover {
+        background: #da190b;
+      }
+      
+      .object-counter {
+        margin-top: 10px;
+        font-size: 12px;
+      }
+      
+      .instructions {
+        position: fixed;
+        bottom: 10px;
+        left: 10px;
+        z-index: 100;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 10px;
+        border-radius: 5px;
+        color: white;
+        font-family: Arial, sans-serif;
+        font-size: 12px;
+      }
+    </style>
   </head>
   <body style="margin:0; overflow:hidden;">
-    <a-scene embedded arjs="trackingMethod: best; sourceType: webcam;">
-      
-      <!-- Hiro marker -->
-      <a-marker preset="hiro">
-        <!-- <a-box position="0 1 0" color="red" depth="1" height="1" width="1"
-               animation="property: rotation; to: 0 360 0; loop: true; dur: 3000">
-        </a-box> -->
-        <a-image src="elmo.png" position="0 0 0" width="1" height="1" rotation="90 180 0"></a-image>
+    <!-- UI Panel -->
+    <div class="ui-panel">
+      <div>
+        <button class="ui-button active" id="cube-btn" onclick="selectObjectType('cube')">Cube</button>
+        <button class="ui-button" id="sphere-btn" onclick="selectObjectType('sphere')">Sphere</button>
+        <button class="ui-button" id="cylinder-btn" onclick="selectObjectType('cylinder')">Cylinder</button>
+      </div>
+      <div>
+        <button class="ui-button delete" onclick="deleteSelectedObject()">Delete Selected</button>
+        <button class="ui-button delete" onclick="clearAllObjects()">Clear All</button>
+      </div>
+      <div class="object-counter">
+        Objects: <span id="object-count">0</span>
+      </div>
+    </div>
 
-       <a-text value="Elmo in AR!"
-        position="0 0.25 0"
-        rotation="-90 0 0"
-        align="center"
-        color="yellow"
-        width="3">
-        </a-text>
+    <!-- Instructions -->
+    <div class="instructions">
+      Click/tap to place objects • Click objects to select • Use buttons to manage
+    </div>
 
-      </a-marker>
-      <a-marker type="pattern" url="pattern.download.patt">
-        <!-- <a-box position="0 1 0" color="red" depth="1" height="1" width="1"
-               animation="property: rotation; to: 0 360 0; loop: true; dur: 3000">
-        </a-box> -->
-        <a-image src="elmo.png" position="0 0 0" width="1" height="1" rotation="90 180 0"></a-image>
+    <!-- live camera feed -->
+    <video id="cam" autoplay playsinline
+      style="position:fixed; width:100%; height:100%; object-fit:cover; z-index:-1;"></video>
 
-       <a-text value="MARKER 222222222"
-        position="0 0.25 0"
-        rotation="-90 0 0"
-        align="center"
-        color="blue"
-        width="3">
-        </a-text>
+    <a-scene embedded>
+      <!-- invisible "floor" plane -->
+      <a-plane id="ground" rotation="-90 0 0" width="100" height="100" 
+               material="opacity: 0; transparent: true" visible="true"></a-plane>
 
-      </a-marker>
-     <!-- <a-sphere position="0 0 -5" radius="0.5" color="blue"></a-sphere> -->
-     <a-text value="Hello World! hi!" 
-        position="0 0 -20" 
-        align="center" 
-        color="red" 
-        width="8">
-    </a-text>
-
-
-
-      <!-- Camera -->
-      <a-entity camera></a-entity>
+      <a-entity camera position="0 1.6 3"></a-entity>
     </a-scene>
+
+    <script>
+      // Object types configuration
+      const objectTypes = {
+        cube: { 
+          primitive: 'a-box', 
+          color: 'orange',
+          width: 0.5,
+          height: 0.5,
+          depth: 0.5
+        },
+        sphere: { 
+          primitive: 'a-sphere', 
+          color: 'blue',
+          radius: 0.3
+        },
+        cylinder: { 
+          primitive: 'a-cylinder', 
+          color: 'green',
+          radius: 0.3,
+          height: 0.6
+        }
+      };
+
+      let currentObjectType = 'cube';
+      let selectedObject = null;
+      let objectCounter = 0;
+
+      // Start camera feed
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+        .then(stream => document.getElementById("cam").srcObject = stream);
+
+      const scene = document.querySelector("a-scene");
+      const camera = scene.camera;
+      const ground = document.querySelector("#ground");
+
+      // Object type selection
+      function selectObjectType(type) {
+        currentObjectType = type;
+        
+        // Update button states
+        document.querySelectorAll('.ui-button').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(type + '-btn').classList.add('active');
+      }
+
+      // Create new object
+      function createObject(position) {
+        const objData = objectTypes[currentObjectType];
+        const newObj = document.createElement(objData.primitive);
+        
+        // Set basic attributes
+        newObj.setAttribute('position', `${position.x} ${position.y} ${position.z}`);
+        newObj.setAttribute('visible', true);
+        newObj.setAttribute('material', `color: ${objData.color}`);
+        
+        // Set specific geometry attributes
+        if (currentObjectType === 'cube') {
+          newObj.setAttribute('width', objData.width);
+          newObj.setAttribute('height', objData.height);
+          newObj.setAttribute('depth', objData.depth);
+        } else if (currentObjectType === 'sphere') {
+          newObj.setAttribute('radius', objData.radius);
+        } else if (currentObjectType === 'cylinder') {
+          newObj.setAttribute('radius', objData.radius);
+          newObj.setAttribute('height', objData.height);
+        }
+        
+        // Add unique ID and click handler
+        newObj.setAttribute('id', `object-${objectCounter++}`);
+        newObj.addEventListener('click', selectObject);
+        
+        scene.appendChild(newObj);
+        updateObjectCount();
+        return newObj;
+      }
+
+      // Object placement handler
+      function placeObject(event) {
+        // Determine coordinates depending on event type
+        let x, y;
+        if (event.touches && event.touches.length > 0) {
+          x = event.touches[0].clientX;
+          y = event.touches[0].clientY;
+        } else {
+          x = event.clientX;
+          y = event.clientY;
+        }
+
+        const mouse = new THREE.Vector2(
+          (x / window.innerWidth) * 2 - 1,
+          -(y / window.innerHeight) * 2 + 1
+        );
+
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(mouse, camera);
+
+        const hit = raycaster.intersectObject(ground.object3D, true);
+        if (hit.length > 0) {
+          const p = hit[0].point;
+          createObject(p);
+        }
+      }
+
+      // Object selection handler
+      function selectObject(event) {
+        event.stopPropagation();
+        
+        // Deselect previous object
+        if (selectedObject) {
+          selectedObject.setAttribute('material', 'color: ' + getOriginalColor(selectedObject));
+        }
+        
+        // Select new object
+        selectedObject = event.target;
+        selectedObject.setAttribute('material', 'color: red');
+        
+        console.log('Selected object:', selectedObject.id);
+      }
+
+      // Get original color of object
+      function getOriginalColor(obj) {
+        const type = obj.getAttribute('primitive') || obj.tagName.toLowerCase();
+        if (type === 'a-box') return 'orange';
+        if (type === 'a-sphere') return 'blue';
+        if (type === 'a-cylinder') return 'green';
+        return 'gray';
+      }
+
+      // Delete selected object
+      function deleteSelectedObject() {
+        if (selectedObject) {
+          scene.removeChild(selectedObject);
+          selectedObject = null;
+          updateObjectCount();
+        }
+      }
+
+      // Clear all objects
+      function clearAllObjects() {
+        const objects = scene.querySelectorAll('a-box, a-sphere, a-cylinder');
+        objects.forEach(obj => scene.removeChild(obj));
+        selectedObject = null;
+        updateObjectCount();
+      }
+
+      // Update object counter
+      function updateObjectCount() {
+        const count = scene.querySelectorAll('a-box, a-sphere, a-cylinder').length;
+        document.getElementById('object-count').textContent = count;
+      }
+
+      // Add event listeners
+      scene.addEventListener("click", placeObject);
+      scene.addEventListener("touchstart", placeObject);
+    </script>
   </body>
 </html>
-
