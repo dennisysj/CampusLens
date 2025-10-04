@@ -3,7 +3,6 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
-import { pool, testSupabaseConnection, initializeTables } from './services/supabase';
 
 // Load environment variables
 dotenv.config();
@@ -54,108 +53,8 @@ app.get('/hello', (req: Request, res: Response) => {
 });
 
 // Users endpoint with PostgreSQL
-app.get('/users', async (req: Request, res: Response) => {
-  try {
-    const result = await pool.query('SELECT * FROM users ORDER BY created_at DESC');
-    
-    res.json({
-      success: true,
-      data: result.rows,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch users',
-      timestamp: new Date().toISOString()
-    });
-  }
-});
 
-// Create user endpoint
-app.post('/users', async (req: Request, res: Response) => {
-  try {
-    const { name, email, age } = req.body;
-    
-    if (!name || !email) {
-      return res.status(400).json({
-        success: false,
-        error: 'Name and email are required',
-        timestamp: new Date().toISOString()
-      });
-    }
 
-    const result = await pool.query(
-      'INSERT INTO users (name, email, age) VALUES ($1, $2, $3) RETURNING *',
-      [name, email, age]
-    );
-
-    res.status(201).json({
-      success: true,
-      data: result.rows[0],
-      message: 'User created successfully',
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Failed to create user',
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// Products endpoint with PostgreSQL
-app.get('/products', async (req: Request, res: Response) => {
-  try {
-    const result = await pool.query('SELECT * FROM products ORDER BY created_at DESC');
-    
-    res.json({
-      success: true,
-      data: result.rows,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch products',
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// Create product endpoint
-app.post('/products', async (req: Request, res: Response) => {
-  try {
-    const { name, description, price, category, in_stock } = req.body;
-    
-    if (!name || !description || !price || !category) {
-      return res.status(400).json({
-        success: false,
-        error: 'Name, description, price, and category are required',
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    const result = await pool.query(
-      'INSERT INTO products (name, description, price, category, in_stock) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [name, description, price, category, in_stock ?? true]
-    );
-
-    res.status(201).json({
-      success: true,
-      data: result.rows[0],
-      message: 'Product created successfully',
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Failed to create product',
-      timestamp: new Date().toISOString()
-    });
-  }
-});
 
 // WebSocket connection handling
 io.on('connection', (socket) => {
@@ -197,13 +96,9 @@ io.on('connection', (socket) => {
   });
 });
 
-// Test PostgreSQL connection and initialize tables on startup
-const initializeDatabase = async () => {
-  await testSupabaseConnection();
-  await initializeTables();
-};
 
-initializeDatabase();
+
+
 
 // Start server
 server.listen(port, '0.0.0.0', () => {
