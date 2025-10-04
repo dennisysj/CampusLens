@@ -2,62 +2,14 @@
   <head>
     <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
     <style>
-      .ui-panel {
-        position: fixed;
-        top: 10px;
-        left: 10px;
-        z-index: 100;
-        background: rgba(0, 0, 0, 0.7);
-        padding: 15px;
-        border-radius: 10px;
-        color: white;
-        font-family: Arial, sans-serif;
-      }
-      
-      .ui-button {
-        background: #4CAF50;
-        border: none;
-        color: white;
-        padding: 10px 15px;
-        margin: 5px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 14px;
-      }
-      
-      .ui-button:hover {
-        background: #45a049;
-      }
-      
-      .ui-button.active {
-        background: #2196F3;
-      }
-      
-      .ui-button.delete {
-        background: #f44336;
-      }
-      
-      .ui-button.delete:hover {
-        background: #da190b;
-      }
-      
-      .object-counter {
-        margin-top: 10px;
-        font-size: 12px;
-      }
-      
-      .instructions {
-        position: fixed;
-        bottom: 10px;
-        left: 10px;
-        z-index: 100;
-        background: rgba(0, 0, 0, 0.7);
-        padding: 6px;
-        border-radius: 5px;
-        color: white;
-        font-family: Arial, sans-serif;
-        font-size: 0.1em;
-      }
+      .ui-panel{position:fixed;top:10px;left:10px;z-index:100;background:rgba(0,0,0,.7);padding:15px;border-radius:10px;color:#fff;font-family:Arial,sans-serif}
+      .ui-button{background:#4CAF50;border:none;color:#fff;padding:10px 15px;margin:5px;border-radius:5px;cursor:pointer;font-size:14px}
+      .ui-button:hover{background:#45a049}
+      .ui-button.active{background:#2196F3}
+      .ui-button.delete{background:#f44336}
+      .ui-button.delete:hover{background:#da190b}
+      .object-counter{margin-top:10px;font-size:12px}
+      .instructions{position:fixed;bottom:10px;left:10px;z-index:100;background:rgba(0,0,0,.7);padding:6px;border-radius:5px;color:#fff;font-family:Arial,sans-serif;font-size:.1em}
     </style>
   </head>
   <body style="margin:0; overflow:hidden;">
@@ -72,15 +24,10 @@
         <button class="ui-button delete" onclick="deleteSelectedObject()">Delete Selected</button>
         <button class="ui-button delete" onclick="clearAllObjects()">Clear All</button>
       </div>
-      <div class="object-counter">
-        Objects: <span id="object-count">0</span>
-      </div>
+      <div class="object-counter">Objects: <span id="object-count">0</span></div>
     </div>
 
-    <!-- Instructions -->
-    <div class="instructions">
-      Tap to Place
-    </div>
+    <div class="instructions">Tap to Place</div>
 
     <!-- live camera feed -->
     <video id="cam" autoplay playsinline
@@ -91,81 +38,67 @@
       <a-entity cursor="rayOrigin: mouse"
                 raycaster="objects: a-box, a-sphere, a-cylinder, #ground"></a-entity>
 
-      <!-- invisible ground plane for placement - covers entire viewport -->
-      <a-plane id="ground" rotation="-90 0 0" width="100" height="100" 
-               position="0 0 0" material="opacity: 0; transparent: true" 
+      <!-- placement plane (tilted 45° in your code) -->
+      <a-plane id="ground"
+               rotation="-45 0 0"
+               width="100" height="100"
+               position="0 0 0"
+               material="side: double; opacity: 0; transparent: true"
                visible="true"></a-plane>
 
-      <!-- Camera positioned to look down at the ground -->
       <a-entity camera position="0 2 2"></a-entity>
     </a-scene>
 
     <script>
-      // Object types configuration
+      // Keep track of placed objects.
+      const registry = new Map(); // id -> { el, type, position, placedAt, sessionId }
+
       const objectTypes = {
-        cube: { 
-          primitive: 'a-box', 
-          color: 'orange',
-          width: 0.5,
-          height: 0.5,
-          depth: 0.5
-        },
-        sphere: { 
-          primitive: 'a-sphere', 
-          color: 'blue',
-          radius: 0.3
-        },
-        cylinder: { 
-          primitive: 'a-cylinder', 
-          color: 'green',
-          radius: 0.3,
-          height: 0.6
-        }
+        cube: { primitive: 'a-box', color: 'orange', width: 0.5, height: 0.5, depth: 0.5 },
+        sphere: { primitive: 'a-sphere', color: 'blue', radius: 0.3 },
+        cylinder: { primitive: 'a-cylinder', color: 'green', radius: 0.3, height: 0.6 }
       };
 
       let currentObjectType = 'cube';
       let selectedObject = null;
       let objectCounter = 0;
 
-      // Start camera feed
       navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
         .then(stream => document.getElementById("cam").srcObject = stream);
 
-      // Wait for scene to load before setting up event handlers
       const sceneEl = document.querySelector('a-scene');
-      
+
       sceneEl.addEventListener('loaded', () => {
         console.log('Scene loaded, setting up click handlers');
-        
-        // Use the actual three.js camera from the camera entity
+
         const cameraEl = sceneEl.querySelector('[camera]');
         const threeCamera = cameraEl.getObject3D('camera');
         const ground = document.querySelector('#ground');
         const canvas = sceneEl.canvas;
 
-        // Object type selection
         function selectObjectType(type) {
           currentObjectType = type;
-          
-          // Update button states
           document.querySelectorAll('.ui-button').forEach(btn => btn.classList.remove('active'));
           document.getElementById(type + '-btn').classList.add('active');
         }
 
-        // Create new object
         function createObject(position) {
+          console.log("------------CREATE OBJECT--------------------");
           const objData = objectTypes[currentObjectType];
           const newObj = document.createElement(objData.primitive);
-          
-          // Set basic attributes
+
+          // Generate a UUID and use it as the element's id
+          const id = crypto.randomUUID();
+          newObj.setAttribute('id', id);
+          newObj.dataset.counter = String(objectCounter++); // optional tracking
+
+          // Base attributes
           newObj.setAttribute('position', `${position.x} ${position.y} ${position.z}`);
           newObj.setAttribute('visible', true);
           newObj.setAttribute('material', `color: ${objData.color}`);
-          
-          // Store base color for later restoration
           newObj.dataset.baseColor = objData.color;
-          
-          // Set specific geometry attributes
+
+          // Geometry
           if (currentObjectType === 'cube') {
             newObj.setAttribute('width', objData.width);
             newObj.setAttribute('height', objData.height);
@@ -176,49 +109,65 @@
             newObj.setAttribute('radius', objData.radius);
             newObj.setAttribute('height', objData.height);
           }
-          
-          // Add unique ID and click handler
-          newObj.setAttribute('id', `object-${objectCounter++}`);
+
+          // Click to select
           newObj.addEventListener('click', selectObject);
-          
-          // Log object coordinates
-          console.log(`📍 Object placed at coordinates: x=${position.x.toFixed(2)}, y=${position.y.toFixed(2)}, z=${position.z.toFixed(2)}`);
-          console.log(`🎯 Object type: ${currentObjectType}, ID: ${newObj.id}`);
-          console.log("HELLLLOOO WORLD!")
-          
+
+          // Add to scene
           sceneEl.appendChild(newObj);
           updateObjectCount();
+
+          // Registry record (use newObj here)
+          const placedAt = new Date().toISOString();
+          const sessionId = localStorage.getItem('sessionId') || (() => {
+            const s = crypto.randomUUID();
+            localStorage.setItem('sessionId', s);
+            return s;
+          })();
+
+          const record = {
+            id,
+            type: currentObjectType,
+            position: { x: position.x, y: position.y, z: position.z },
+            placedAt,
+            sessionId
+          };
+          registry.set(id, { el: newObj, ...record });
+
+          // Logs
+          console.log("------------COORDINATES--------------------");
+          console.log(`📍 Placed ${record.type} ${id} at x=${position.x.toFixed(2)}, y=${position.y.toFixed(2)}, z=${position.z.toFixed(2)}`);
+          console.log(`🎯 A-Frame element id: ${newObj.id} (counter ${newObj.dataset.counter})`);
+          console.log("------------------------------------------------");
+
+          // send to backend (will need CORS on server)
+          fetch('http://localhost:3000/placements', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(record)
+          }).catch(err => console.error('POST /placements failed:', err));
+
           return newObj;
         }
 
-        // Object placement handler with proper canvas-relative coordinates
         function placeObject(event) {
           console.log('Place object called!');
-          
-          // Prevent event bubbling
           event.stopPropagation();
-          
-          // Get client coords
+
           const x = (event.touches?.[0]?.clientX ?? event.clientX);
           const y = (event.touches?.[0]?.clientY ?? event.clientY);
-
-          console.log('Click position:', x, y);
-
-          // Convert to canvas-relative NDC
           const rect = canvas.getBoundingClientRect();
           const mouse = new THREE.Vector2(
             ((x - rect.left) / rect.width) * 2 - 1,
             -((y - rect.top) / rect.height) * 2 + 1
           );
 
-          console.log('Canvas-relative mouse:', mouse);
-
           const raycaster = new THREE.Raycaster();
           raycaster.setFromCamera(mouse, threeCamera);
 
           const hits = raycaster.intersectObject(ground.object3D, true);
           console.log('Raycast hits:', hits.length);
-          
+
           if (hits.length) {
             const p = hits[0].point;
             console.log('Hit point:', p);
@@ -228,59 +177,52 @@
           }
         }
 
-        // Object selection handler
         function selectObject(event) {
           event.stopPropagation();
-          
-          // Deselect previous object
           if (selectedObject) {
             selectedObject.setAttribute('material', 'color: ' + getOriginalColor(selectedObject));
           }
-          
-          // Select new object
           selectedObject = event.target;
           selectedObject.setAttribute('material', 'color: red');
-          
           console.log('Selected object:', selectedObject.id);
         }
 
-        // Get original color of object
         function getOriginalColor(obj) {
           return obj.dataset.baseColor || 'gray';
         }
 
-        // Delete selected object
         function deleteSelectedObject() {
           if (selectedObject) {
+            registry.delete(selectedObject.id);
             sceneEl.removeChild(selectedObject);
             selectedObject = null;
             updateObjectCount();
           }
         }
 
-        // Clear all objects
         function clearAllObjects() {
           const objects = sceneEl.querySelectorAll('a-box, a-sphere, a-cylinder');
-          objects.forEach(obj => sceneEl.removeChild(obj));
+          objects.forEach(obj => {
+            registry.delete(obj.id);
+            sceneEl.removeChild(obj);
+          });
           selectedObject = null;
           updateObjectCount();
         }
 
-        // Update object counter
         function updateObjectCount() {
           const count = sceneEl.querySelectorAll('a-box, a-sphere, a-cylinder').length;
           document.getElementById('object-count').textContent = count;
         }
 
-        // Make functions globally available
+        // Expose UI handlers
         window.selectObjectType = selectObjectType;
         window.deleteSelectedObject = deleteSelectedObject;
         window.clearAllObjects = clearAllObjects;
 
-        // Attach to the canvas (reliable target)
+        // Attach listeners
         canvas.addEventListener('click', placeObject, { passive: true });
         canvas.addEventListener('touchstart', placeObject, { passive: true });
-        
         console.log('Event handlers attached to canvas');
       });
     </script>

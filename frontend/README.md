@@ -1,1 +1,2 @@
 # CampusLens
+in createObject() is where the fetch call is housed, it should pass the id of the object, position RELATIVE to the camera, the id is uniquely generated using crypto.UIID. Also make sure to save this object in the database so that it can be retrived by other users.
