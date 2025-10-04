@@ -1,0 +1,55 @@
+<html>
+  <head>
+    <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
+  </head>
+  <body style="margin:0; overflow:hidden;">
+    <a-scene embedded arjs="trackingMethod: best; sourceType: webcam;">
+      
+      <!-- Hiro marker -->
+      <a-marker preset="hiro">
+        <!-- <a-box position="0 1 0" color="red" depth="1" height="1" width="1"
+               animation="property: rotation; to: 0 360 0; loop: true; dur: 3000">
+        </a-box> -->
+        <a-image src="elmo.png" position="0 0 0" width="1" height="1" rotation="90 180 0"></a-image>
+
+       <a-text value="Elmo in AR!"
+        position="0 0.25 0"
+        rotation="-90 0 0"
+        align="center"
+        color="yellow"
+        width="3">
+        </a-text>
+
+      </a-marker>
+      <a-marker type="pattern" url="pattern.download.patt">
+        <!-- <a-box position="0 1 0" color="red" depth="1" height="1" width="1"
+               animation="property: rotation; to: 0 360 0; loop: true; dur: 3000">
+        </a-box> -->
+        <a-image src="elmo.png" position="0 0 0" width="1" height="1" rotation="90 180 0"></a-image>
+
+       <a-text value="MARKER 222222222"
+        position="0 0.25 0"
+        rotation="-90 0 0"
+        align="center"
+        color="blue"
+        width="3">
+        </a-text>
+
+      </a-marker>
+     <!-- <a-sphere position="0 0 -5" radius="0.5" color="blue"></a-sphere> -->
+     <a-text value="Hello World!" 
+        position="0 0 -20" 
+        align="center" 
+        color="red" 
+        width="8">
+    </a-text>
+
+
+
+      <!-- Camera -->
+      <a-entity camera></a-entity>
+    </a-scene>
+  </body>
+</html>
+
