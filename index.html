@@ -52,11 +52,11 @@
         left: 10px;
         z-index: 100;
         background: rgba(0, 0, 0, 0.7);
-        padding: 10px;
+        padding: 6px;
         border-radius: 5px;
         color: white;
         font-family: Arial, sans-serif;
-        font-size: 12px;
+        font-size: 0.1em;
       }
     </style>
   </head>
@@ -71,7 +71,6 @@
       <div>
         <button class="ui-button delete" onclick="deleteSelectedObject()">Delete Selected</button>
         <button class="ui-button delete" onclick="clearAllObjects()">Clear All</button>
-        <button class="ui-button" onclick="testPlaceObject()">Test Place</button>
       </div>
       <div class="object-counter">
         Objects: <span id="object-count">0</span>
@@ -80,7 +79,7 @@
 
     <!-- Instructions -->
     <div class="instructions">
-      Click anywhere to place objects • Click objects to select • Use buttons to manage
+      Tap to Place
     </div>
 
     <!-- live camera feed -->
@@ -181,6 +180,11 @@
           // Add unique ID and click handler
           newObj.setAttribute('id', `object-${objectCounter++}`);
           newObj.addEventListener('click', selectObject);
+          
+          // Log object coordinates
+          console.log(`📍 Object placed at coordinates: x=${position.x.toFixed(2)}, y=${position.y.toFixed(2)}, z=${position.z.toFixed(2)}`);
+          console.log(`🎯 Object type: ${currentObjectType}, ID: ${newObj.id}`);
+          console.log("HELLLLOOO WORLD!")
           
           sceneEl.appendChild(newObj);
           updateObjectCount();
