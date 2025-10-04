@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Test Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .messages {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 10px 0;
+            background-color: #f9f9f9;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 4px;
+        }
+        .system { background-color: #e9ecef; }
+        .user { background-color: #d1ecf1; }
+        .server { background-color: #fff3cd; }
+        input, button {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 WebSocket Test Client</h1>
+        
+        <div id="status" class="status disconnected">
+            Disconnected
+        </div>
+
+        <div>
+            <button id="connectBtn" onclick="connect()">Connect</button>
+            <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+            <button id="pingBtn" onclick="ping()" disabled>Ping Server</button>
+        </div>
+
+        <div>
+            <input type="text" id="usernameInput" placeholder="Your username" value="TestUser">
+            <input type="text" id="messageInput" placeholder="Type a message..." onkeypress="handleKeyPress(event)">
+            <button id="sendBtn" onclick="sendMessage()" disabled>Send Message</button>
+        </div>
+
+        <div>
+            <input type="text" id="customEventInput" placeholder="Custom event data (JSON)">
+            <button id="customEventBtn" onclick="sendCustomEvent()" disabled>Send Custom Event</button>
+        </div>
+
+        <h3>Messages:</h3>
+        <div id="messages" class="messages"></div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        let socket = null;
+        let isConnected = false;
+
+        function connect() {
+            if (socket) return;
+            
+            socket = io();
+            
+            socket.on('connect', () => {
+                isConnected = true;
+                updateStatus('Connected', 'connected');
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = false;
+                document.getElementById('pingBtn').disabled = false;
+                document.getElementById('sendBtn').disabled = false;
+                document.getElementById('customEventBtn').disabled = false;
+                addMessage('Connected to server!', 'system');
+            });
+
+            socket.on('disconnect', () => {
+                isConnected = false;
+                updateStatus('Disconnected', 'disconnected');
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = true;
+                document.getElementById('pingBtn').disabled = true;
+                document.getElementById('sendBtn').disabled = true;
+                document.getElementById('customEventBtn').disabled = true;
+                addMessage('Disconnected from server', 'system');
+            });
+
+            socket.on('welcome', (data) => {
+                addMessage(`Welcome: ${data.message}`, 'server');
+            });
+
+            socket.on('pong', (data) => {
+                addMessage(`Pong received: ${JSON.stringify(data)}`, 'server');
+            });
+
+            socket.on('chat_message', (data) => {
+                addMessage(`${data.username}: ${data.message}`, 'user');
+            });
+
+            socket.on('user_joined', (data) => {
+                addMessage(`User joined: ${data.clientId} (Total: ${data.totalClients})`, 'system');
+            });
+
+            socket.on('user_left', (data) => {
+                addMessage(`User left: ${data.clientId} (Total: ${data.totalClients})`, 'system');
+            });
+
+            socket.on('server_status', (data) => {
+                addMessage(`Server status: ${data.connectedClients} clients, uptime: ${Math.round(data.uptime)}s`, 'server');
+            });
+
+            socket.on('custom_event_response', (data) => {
+                addMessage(`Custom event response: ${JSON.stringify(data)}`, 'server');
+            });
+        }
+
+        function disconnect() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+        }
+
+        function ping() {
+            if (socket && isConnected) {
+                socket.emit('ping', { timestamp: new Date().toISOString() });
+                addMessage('Ping sent', 'user');
+            }
+        }
+
+        function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const usernameInput = document.getElementById('usernameInput');
+            const message = messageInput.value.trim();
+            const username = usernameInput.value.trim() || 'Anonymous';
+
+            if (message && socket && isConnected) {
+                socket.emit('chat_message', { message, username });
+                messageInput.value = '';
+            }
+        }
+
+        function sendCustomEvent() {
+            const customEventInput = document.getElementById('customEventInput');
+            const data = customEventInput.value.trim();
+
+            if (data && socket && isConnected) {
+                try {
+                    const parsedData = JSON.parse(data);
+                    socket.emit('custom_event', parsedData);
+                    addMessage(`Custom event sent: ${data}`, 'user');
+                    customEventInput.value = '';
+                } catch (e) {
+                    alert('Invalid JSON format');
+                }
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function updateStatus(text, className) {
+            const status = document.getElementById('status');
+            status.textContent = text;
+            status.className = `status ${className}`;
+        }
+
+        function addMessage(text, type) {
+            const messages = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+            messages.appendChild(messageDiv);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        // Auto-connect on page load
+        window.onload = () => {
+            connect();
+        };
+    </script>
+</body>
+</html>
