@@ -1,6 +1,7 @@
 <html>
   <head>
     <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+    <script src="assets.js" defer></script>
     <style>
       .ui-panel {
         position: fixed;
@@ -113,8 +114,18 @@
       </div>
     </div>
 
+    <div class="ui-panel" id="assets-panel" style="top: 150px;">
+      <h4>Assets</h4>
+      <div id="asset-thumbnails">
+        <!-- JS will dynamically insert Poly Pizza assets here -->
+      </div>
+    </div>
+    
+
     <!-- Instructions -->
-    <div class="instructions">Tap to Place | Drag red handles to resize text</div>
+    <div class="instructions">
+      Tap to Place | Drag red handles to resize text
+    </div>
 
     <!-- live camera feed -->
     <video
@@ -134,7 +145,7 @@
       <!-- enables mouse-based raycasting onto entities -->
       <a-entity
         cursor="rayOrigin: mouse"
-        raycaster="objects: a-box, a-sphere, a-cylinder, #ground"
+        raycaster="objects: a-box, a-sphere, a-cylinder, #ground, .resize-handle"
       ></a-entity>
 
       <!-- invisible ground plane for placement - covers entire viewport -->
@@ -201,13 +212,11 @@
               width: 1.5,
               height: 0.6,
               position: "0 0 0",
-             
             },
             {
               primitive: "a-entity",
               text: "value: Example Text; color: black; width: 2; align: center",
               position: "0 0.25 0",
-             
             },
             {
               primitive: "a-sphere",
@@ -308,6 +317,7 @@
 
             if (currentObjectType === "textBox") {
               makeTextBoxResizable(newObj);
+              console.log(newObj.userData);
             }
           } else {
             newObj = document.createElement(objData.primitive);
@@ -341,20 +351,26 @@
         function makeTextBoxResizable(textBoxEntity) {
           const plane = textBoxEntity.querySelector("a-plane");
           const text = textBoxEntity.querySelector("a-entity[text]");
-          const handles = Array.from(textBoxEntity.querySelectorAll(".resize-handle"));
+          const handles = Array.from(
+            textBoxEntity.querySelectorAll(".resize-handle")
+          );
 
           // Store references
           textBoxEntity.userData = {
             plane: plane,
             text: text,
-            handles: handles
+            handles: handles,
           };
         }
 
         // Object placement handler
         function placeObject(event) {
-          if (isResizing) return;
-          
+          console.log("placeObject triggered");
+          if (isResizing) {
+            console.log("is resizing");
+            return;
+          }
+
           // Check if we clicked on a resize handle first
           const x = event.touches?.[0]?.clientX ?? event.clientX;
           const y = event.touches?.[0]?.clientY ?? event.clientY;
@@ -368,29 +384,39 @@
           raycaster.setFromCamera(mouse, threeCamera);
 
           // Check for handle hits first
-          const allHandles = [];
-          sceneEl.querySelectorAll(".resize-handle").forEach(h => {
-            if (h.object3D) allHandles.push(h.object3D);
+          const allHandleMeshes = [];
+          sceneEl.querySelectorAll(".resize-handle").forEach((h) => {
+            if (h.object3D) {
+              h.object3D.traverse((obj) => {
+                if (obj.isMesh) allHandleMeshes.push(obj);
+              });
+            }
           });
 
-          if (allHandles.length > 0) {
-            const handleHits = raycaster.intersectObjects(allHandles, true);
+          if (allHandleMeshes.length > 0) {
+            console.log("andleLog above 0");
+            allHandleMeshes.forEach((m) => console.log(m, m.geometry));
+
+            // for some reason this isnt working!! not detecing.
+            const handleHits = raycaster.intersectObjects(
+              allHandleMeshes,
+              true
+            );
+
+            console.log(handleHits.length);
+
             if (handleHits.length > 0) {
-              // Found a handle, start resizing
-              const handleObj = handleHits[0].object;
-              // Find the A-Frame element
-              let handleEl = null;
-              sceneEl.querySelectorAll(".resize-handle").forEach(h => {
-                if (h.object3D === handleObj || h.object3D.children.includes(handleObj)) {
-                  handleEl = h;
-                }
-              });
-              
+              const hitObj = handleHits[0].object;
+              const handleEl = hitObj.el; // A-Frame element
+
+              console.log("Handle hit detected:", handleEl);
+
               if (handleEl) {
                 const textBox = handleEl.parentElement;
                 if (textBox && textBox.userData) {
+                  console.log("resizing"); // ✅ This should now print
                   startResizeFromHandle(event, handleEl, textBox);
-                  return;
+                  return; // stop placement
                 }
               }
             }
@@ -407,23 +433,23 @@
         function startResizeFromHandle(event, handleEl, textBoxEntity) {
           event.stopPropagation();
           if (event.preventDefault) event.preventDefault();
-          
+
           isResizing = true;
-          
+
           const plane = textBoxEntity.userData.plane;
           const text = textBoxEntity.userData.text;
-          const handles = textBoxEntity.userData.handles;
+          const handle = textBoxEntity.userData.handles[0]; // Only use first handle (top-left)
 
           const startX = event.clientX || event.touches?.[0]?.clientX || 0;
           const startY = event.clientY || event.touches?.[0]?.clientY || 0;
           const startWidth = parseFloat(plane.getAttribute("width"));
           const startHeight = parseFloat(plane.getAttribute("height"));
-          
-          const handlePos = handleEl.getAttribute("position").split(" ").map(parseFloat);
-          const isRight = handlePos[0] > 0;
-          const isTop = handlePos[1] > 0;
 
-          console.log("Resize started", {isRight, isTop});
+          // Top-left handle is always at negative X, positive Y
+          const isRight = false;
+          const isTop = true;
+
+          console.log("Resize started from top-left handle");
 
           function onMove(e) {
             const currentX = e.clientX || e.touches?.[0]?.clientX || startX;
@@ -432,19 +458,19 @@
             const dx = (currentX - startX) * 0.005;
             const dy = (startY - currentY) * 0.005;
 
-            const newWidth = Math.max(0.3, startWidth + dx * (isRight ? 2 : -2));
-            const newHeight = Math.max(0.3, startHeight + dy * (isTop ? 2 : -2));
+            const newWidth = Math.max(0.3, startWidth + dx * -2); // Left drag increases width
+            const newHeight = Math.max(0.3, startHeight + dy * 2); // Up drag increases height
 
             plane.setAttribute("width", newWidth);
             plane.setAttribute("height", newHeight);
+
             text.setAttribute("scale", `${newWidth / 3} ${newHeight / 3} 0.5`);
 
-            handles.forEach((h) => {
-              const pos = h.getAttribute("position").split(" ").map(parseFloat);
-              const posX = pos[0] > 0 ? newWidth / 2 : -newWidth / 2;
-              const posY = pos[1] > 0 ? newHeight / 2 : -newHeight / 2;
-              h.setAttribute("position", `${posX} ${posY} 0.02`);
-            });
+            // Only update the top-left handle position
+            handle.setAttribute(
+              "position",
+              `${-newWidth / 2} ${newHeight / 2} 0.02`
+            );
           }
 
           function onEnd(e) {
@@ -500,8 +526,8 @@
 
         function updateObjectCount() {
           // Only count objects with IDs starting with 'object-' that are direct children of scene
-          const objects = Array.from(sceneEl.children).filter(child => 
-            child.id && child.id.startsWith('object-')
+          const objects = Array.from(sceneEl.children).filter(
+            (child) => child.id && child.id.startsWith("object-")
           );
           document.getElementById("object-count").textContent = objects.length;
         }
@@ -512,7 +538,7 @@
         window.clearAllObjects = clearAllObjects;
 
         canvas.addEventListener("click", placeObject, { passive: true });
-        canvas.addEventListener("touchstart", placeObject, { passive: true });
+        canvas.addEventListener("touchstart", placeObject, { passive: false });
 
         console.log("Event handlers attached");
       });
