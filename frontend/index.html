@@ -6,48 +6,69 @@
     <!-- AR.js for A-Frame (includes new-location-based components) -->
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
     <style>
-      .ui-panel{position:fixed;top:10px;left:10px;z-index:100;background:rgba(0,0,0,.7);padding:15px;border-radius:10px;color:#fff;font-family:Arial,sans-serif}
-      .ui-button{background:#4CAF50;border:none;color:#fff;padding:10px 15px;margin:5px;border-radius:5px;cursor:pointer;font-size:14px}
+      /* Full-screen, correct aspect on all devices */
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100dvw;
+        height: 100dvh;
+        overflow: hidden;
+      }
+      a-scene {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100dvw !important;
+        height: 100dvh !important;
+        z-index: 1 !important;
+      }
+      /* Let AR.js video fill safely without distortion (use 'cover' to crop) */
+      video[playsinline] {
+        position: fixed;
+        inset: 0;
+        width: 100dvw;
+        height: 100dvh;
+        object-fit: contain; /* change to 'cover' if you prefer edge-to-edge with crop */
+        z-index: -1;
+      }
+
+      /* UI */
+      .ui-panel{position:fixed;top:10px;left:10px;z-index:100;background:rgba(0,0,0,.7);padding:8px;border-radius:8px;color:#fff;font-family:Arial,sans-serif;max-width:90vw}
+      .ui-button{background:#4CAF50;border:none;color:#fff;padding:6px 10px;margin:3px;border-radius:4px;cursor:pointer;font-size:11px;white-space:nowrap}
       .ui-button:hover{background:#45a049}
       .ui-button.active{background:#2196F3}
       .ui-button.delete{background:#f44336}
       .ui-button.delete:hover{background:#da190b}
-      .object-counter{margin-top:10px;font-size:12px}
-      .instructions{position:fixed;bottom:10px;left:10px;z-index:100;background:rgba(0,0,0,.7);padding:6px;border-radius:5px;color:#fff;font-family:Arial,sans-serif;font-size:.9em}
-      .row{margin-top:8px}
-      input[type="number"]{width:130px;border-radius:4px;border:none;padding:6px;margin-right:6px}
+      .object-counter{margin-top:6px;font-size:10px}
+      .instructions{position:fixed;bottom:10px;left:10px;z-index:100;background:rgba(0,0,0,.7);padding:6px 10px;border-radius:5px;color:#fff;font-family:Arial,sans-serif;font-size:11px;max-width:90vw}
+      .row{margin-top:6px}
+      input[type="number"]{width:90px;border-radius:4px;border:none;padding:4px;margin-right:4px;font-size:11px}
       
-      /* Full-screen AR camera */
-      html, body {
-        margin: 0 !important;
-        padding: 0 !important;
-        width: 100vw !important;
-        height: 100vh !important;
-        overflow: hidden !important;
+      /* Responsive */
+      @media (max-width: 768px) {
+        .ui-panel{padding:6px;top:5px;left:5px}
+        .ui-button{padding:5px 8px;margin:2px;font-size:10px}
+        .object-counter{font-size:9px}
+        .instructions{font-size:10px;bottom:5px;left:5px;padding:5px 8px}
+        input[type="number"]{width:70px;padding:3px;font-size:10px}
       }
-      
-      a-scene {
-        width: 100vw !important;
-        height: 100vh !important;
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        z-index: 1 !important;
+      @media (max-width: 400px) {
+        .ui-panel{padding:4px;top:3px;left:3px}
+        .ui-button{padding:4px 6px;margin:2px;font-size:9px}
+        .object-counter{font-size:8px}
+        .instructions{font-size:9px;bottom:3px;left:3px;padding:4px 6px}
+        input[type="number"]{width:60px;padding:2px;font-size:9px}
       }
-      
-      /* AR.js video element */
-      a-scene video {
-        width: 100vw !important;
-        height: 100vh !important;
-        object-fit: cover !important;
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        z-index: -1 !important;
+
+      /* iOS motion permission button */
+      .ios-motion-btn{
+        position:fixed;bottom:12px;left:12px;z-index:999;background:#2196F3;border:none;color:#fff;
+        padding:8px 12px;border-radius:5px;cursor:pointer;font-size:12px;
       }
+      @media (max-width: 768px) {.ios-motion-btn{bottom:8px;left:8px;padding:6px 10px;font-size:11px}}
+      @media (max-width: 400px) {.ios-motion-btn{bottom:5px;left:5px;padding:5px 8px;font-size:10px}}
     </style>
   </head>
-  <body style="margin:0; padding:0; overflow:hidden; width:100vw; height:100vh;">
+  <body>
     <!-- UI -->
     <div class="ui-panel">
       <div>
@@ -73,25 +94,20 @@
       <div class="object-counter">Objects: <span id="object-count">0</span></div>
     </div>
 
-    <div class="instructions">Loading camera... Please allow camera access when prompted.</div>
-    
-    <!-- Camera permission button -->
-    <button id="cameraPerm" style="position:fixed;bottom:50px;right:12px;z-index:999;background:#4CAF50;border:none;color:#fff;padding:10px 15px;border-radius:5px;cursor:pointer;">Enable Camera</button>
+    <div class="instructions">Camera will request permission. Tap to place (Tap mode) or add GPS pin.</div>
 
     <!-- A-Frame + AR.js -->
     <a-scene
       embedded
       vr-mode-ui="enabled:false"
       renderer="logarithmicDepthBuffer:true; alpha: true;"
-      arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: true; sourceWidth:1280; sourceHeight:960; displayWidth: 1280; displayHeight: 960;"
-      style="width: 100vw; height: 100vh; position: fixed; top: 0; left: 0;">
+      <!-- Let AR.js pick stream/display sizes to match device -->
+      arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false">
 
-      <!-- Basic camera without GPS -->
-      <a-camera id="cam" position="0 0 0" look-controls="enabled: false" wasd-controls="enabled: false">
-      </a-camera>
+      <!-- Basic camera (no GPS here; GPS anchor is created per-entity) -->
+      <a-camera id="cam" position="0 0 0" look-controls="enabled: false" wasd-controls="enabled: false"></a-camera>
 
-      <!-- (Optional) invisible “edit plane” so your existing raycaster can hit something.
-           This is NOT real plane detection; it’s just a helper for selection/resizing. -->
+      <!-- Optional helper plane for editing (not real plane detection) -->
       <a-plane id="edit-plane" rotation="-90 0 0" width="200" height="200"
                position="0 0 -4" visible="false"></a-plane>
 
@@ -101,11 +117,11 @@
     </a-scene>
 
     <!-- iOS motion permission -->
-    <button id="iosPerm" style="position:fixed;bottom:12px;left:12px;z-index:999;">Enable Motion</button>
+    <button id="iosPerm" class="ios-motion-btn">Enable Motion</button>
 
     <script>
       // ---------- UI state ----------
-      let mode = 'tap'; // 'tap' (place 2m ahead) or 'gps' (create gps-new-entity-place)
+      let mode = 'tap'; // 'tap' or 'gps'
       function setActiveMode(){
         document.getElementById('gps-row').style.display = (mode==='gps')?'block':'none';
       }
@@ -118,7 +134,7 @@
         iosPerm.remove();
       };
 
-      // ---------- Your object definitions ----------
+      // ---------- Object definitions ----------
       const objectTypes = {
         cube:{primitive:'a-box',color:'orange',width:0.5,height:0.5,depth:0.5},
         sphere:{primitive:'a-sphere',color:'blue',radius:0.3},
@@ -136,14 +152,13 @@
       };
       let currentObjectType='cube', selectedObject=null, objectCounter=0, isResizing=false;
 
-      // Expose selection functions to buttons
       window.selectObjectType = (t)=>{
         currentObjectType=t;
         document.querySelectorAll('.ui-button').forEach(b=>b.classList.remove('active'));
         const btn=document.getElementById(t+'-btn'); if(btn) btn.classList.add('active');
       };
 
-      // ---------- Create object (common) ----------
+      // ---------- Build object ----------
       function buildObject(positionVec3){
         const sceneEl = document.querySelector('a-scene');
         const objData = objectTypes[currentObjectType];
@@ -192,29 +207,25 @@
         ent.userData = { plane, text, handles };
       }
 
-      // ---------- Placement modes ----------
-      // B) Tap-to-place ~2m in front of camera (simple, no plane detection)
+      // ---------- Placement ----------
       function placeInFront(distanceM=2){
         const camEl = document.getElementById('cam');
         const camObj = camEl.object3D;
         const dir = new THREE.Vector3();
-        camObj.getWorldDirection(dir); // unit vector pointing forward
+        camObj.getWorldDirection(dir);
         const pos = new THREE.Vector3();
         camObj.getWorldPosition(pos);
         const target = pos.add(dir.multiplyScalar(distanceM));
-        // lift slightly so it’s visible
         target.y += 0.2;
         buildObject(target);
       }
 
-      // A) GPS: create a gps-new-entity-place wrapper, then put your object inside at local (0 0 0)
       function addAtLatLng(lat, lon){
         const sceneEl = document.querySelector('a-scene');
         const anchor = document.createElement('a-entity');
         anchor.setAttribute('gps-new-entity-place', `latitude:${lat}; longitude:${lon}`);
         anchor.setAttribute('id', `object-${objectCounter++}`);
 
-        // put your geometry as child at local 0,0,0:
         const child = buildObject(new THREE.Vector3(0,0,0));
         anchor.appendChild(child);
         sceneEl.appendChild(anchor);
@@ -241,7 +252,6 @@
         if(!selectedObject) return;
         const sceneEl = document.querySelector('a-scene');
         if (selectedObject.parentElement && selectedObject.parentElement.hasAttribute('gps-new-entity-place')){
-          // if you clicked the child, remove the parent anchor so GPS object fully goes away
           sceneEl.removeChild(selectedObject.parentElement);
         } else {
           sceneEl.removeChild(selectedObject);
@@ -265,123 +275,14 @@
       }
 
       // ---------- Input handlers ----------
-      // In Tap mode, tapping anywhere drops 2m ahead.
       const sceneEl = document.querySelector('a-scene');
-      sceneEl.addEventListener('click', (e)=>{ if(isResizing) return; if(mode==='tap') placeInFront(2); }, {passive:true});
-      sceneEl.addEventListener('touchstart', (e)=>{ if(isResizing) return; if(mode==='tap') placeInFront(2); }, {passive:true});
+      sceneEl.addEventListener('click', ()=>{ if(isResizing) return; if(mode==='tap') placeInFront(2); }, {passive:true});
+      sceneEl.addEventListener('touchstart', ()=>{ if(isResizing) return; if(mode==='tap') placeInFront(2); }, {passive:true});
 
-      // ---------- Demo: seed a GPS pin (edit these to test outdoors) ----------
-      // addAtLatLng(49.2827, -123.1207); // ← uncomment to spawn one at these coords
-
-      // ---------- Camera initialization and error handling ----------
-      document.addEventListener('DOMContentLoaded', function() {
-        const scene = document.querySelector('a-scene');
-        const cameraPermBtn = document.getElementById('cameraPerm');
-        
-        // Check if we're on HTTPS (required for camera access)
-        if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-          alert('Camera access requires HTTPS. Please use https:// or localhost');
-        }
-
-        // Wait for scene to load
-        scene.addEventListener('loaded', function() {
-          console.log('A-Frame scene loaded');
-        });
-
-        // Handle AR.js initialization
-        scene.addEventListener('arjs-video-loaded', function() {
-          console.log('AR.js video loaded successfully');
-          document.querySelector('.instructions').textContent = 'Camera ready! Tap to place objects.';
-          cameraPermBtn.style.display = 'none';
-          
-          // Force video to fill entire screen
-          const videos = document.querySelectorAll('video');
-          console.log('Found ' + videos.length + ' video elements');
-          videos.forEach((video, index) => {
-            console.log('Video ' + index + ':', video);
-            video.style.width = '100vw';
-            video.style.height = '100vh';
-            video.style.objectFit = 'cover';
-            video.style.position = 'fixed';
-            video.style.top = '0';
-            video.style.left = '0';
-            video.style.zIndex = '-1';
-            video.play();
-            console.log('Video ' + index + ' configured and playing');
-          });
-        });
-
-        scene.addEventListener('arjs-video-error', function() {
-          console.error('AR.js video error');
-          document.querySelector('.instructions').textContent = 'Camera error. Click "Enable Camera" button.';
-          cameraPermBtn.style.display = 'block';
-        });
-
-        // Camera permission button handler
-        cameraPermBtn.onclick = function() {
-          if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            navigator.mediaDevices.getUserMedia({ video: true })
-              .then(function(stream) {
-                console.log('Camera permission granted');
-                document.querySelector('.instructions').textContent = 'Camera permission granted. Reloading...';
-                setTimeout(() => location.reload(), 1000);
-              })
-              .catch(function(error) {
-                console.error('Camera permission denied:', error);
-                document.querySelector('.instructions').textContent = 'Camera permission denied. Please allow camera access.';
-              });
-          } else {
-            document.querySelector('.instructions').textContent = 'Camera not supported on this device.';
-          }
-        };
-
-        // Auto-request camera permissions and force video display
-        setTimeout(() => {
-          if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-              .then(function(stream) {
-                console.log('Camera permission granted automatically');
-                cameraPermBtn.style.display = 'none';
-                document.querySelector('.instructions').textContent = 'Camera permission granted. Initializing AR...';
-                
-                // Force video display immediately and repeatedly
-                const forceVideoDisplay = () => {
-                  const videos = document.querySelectorAll('video');
-                  console.log('Forcing video display. Found ' + videos.length + ' videos');
-                  
-                  videos.forEach((video, index) => {
-                    video.style.width = '100vw';
-                    video.style.height = '100vh';
-                    video.style.objectFit = 'cover';
-                    video.style.position = 'fixed';
-                    video.style.top = '0';
-                    video.style.left = '0';
-                    video.style.zIndex = '-1';
-                    video.style.display = 'block';
-                    video.style.visibility = 'visible';
-                    
-                    // Make sure video is playing
-                    if (video.paused) {
-                      video.play().catch(e => console.log('Play error:', e));
-                    }
-                    console.log('Video ' + index + ' display forced');
-                  });
-                };
-                
-                // Call multiple times to ensure it works
-                setTimeout(forceVideoDisplay, 1000);
-                setTimeout(forceVideoDisplay, 2000);
-                setTimeout(forceVideoDisplay, 3000);
-                setTimeout(forceVideoDisplay, 5000);
-              })
-              .catch(function(error) {
-                console.log('Camera permission not granted automatically, showing button');
-                cameraPermBtn.style.display = 'block';
-                document.querySelector('.instructions').textContent = 'Camera permission needed. Click "Enable Camera" button.';
-              });
-          }
-        }, 1000);
-      });
+      // HTTPS hint
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        console.warn('Camera access requires HTTPS. Use https:// or localhost during dev.');
+      }
     </script>
   </body>
 </html>
