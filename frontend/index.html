@@ -72,6 +72,8 @@
     <!-- UI -->
     <div class="ui-panel">
       <div>
+        <button class="ui-button" onclick="placeGLBInFront('fox', true)">Place Box (GLB)</button>
+
         <button class="ui-button active" id="cube-btn" onclick="selectObjectType('cube')">Cube</button>
         <button class="ui-button" id="sphere-btn" onclick="selectObjectType('sphere')">Sphere</button>
         <button class="ui-button" id="cylinder-btn" onclick="selectObjectType('cylinder')">Cylinder</button>
@@ -350,8 +352,67 @@
         console.warn('Camera access requires HTTPS. Use https:// or localhost during dev.');
       }
 
+      //test
+      // Sample GLB catalog
+const GLB = {
+  duck: { url:'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/Duck/glTF-Binary/Duck.glb', scale:'0.02 0.02 0.02' },
+  fox:  { url:'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/Fox/glTF-Binary/Fox.glb',   scale:'0.03 0.03 0.03', animation:true },
+  box:  { url:'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/Box/glTF-Binary/Box.glb',  scale:'0.5 0.5 0.5' },
+};
+
+function placeGLBInFront(name='box', withFrame=false, distanceM=2){
+  const spec = GLB[name];
+  if (!spec) { console.warn('Unknown GLB key:', name); return null; }
+
+  const camEl = document.getElementById('cam');
+  const camObj = camEl.object3D;
+
+  // Camera's forward: local -Z transformed to world
+  const forward = new THREE.Vector3(0, 0, -0.5).applyQuaternion(camObj.quaternion).normalize();
+
+  const camPos = new THREE.Vector3();
+  camObj.getWorldPosition(camPos);
+
+  // Place in front of camera along forward
+  const target = camPos.clone().add(forward.multiplyScalar(distanceM));
+  target.y += 0.2;
+
+  const coords = { x: target.x, y: target.y, z: target.z };
+  console.log(`[GLB] Forward=`, forward, `Placing "${name}" at`, coords);
+
+  // Wrapper so we can rotate/scale easily
+  const wrapper = document.createElement('a-entity');
+  wrapper.setAttribute('position', `${coords.x} ${coords.y} ${coords.z}`);
+
+  const model = document.createElement('a-entity');
+  model.setAttribute('gltf-model', spec.url);
+  model.setAttribute('scale', spec.scale);
+  model.setAttribute('crossorigin', 'anonymous');
+  if (spec.animation) model.setAttribute('animation-mixer', '');
+  wrapper.appendChild(model);
+
+  if (withFrame){
+    const frame = document.createElement('a-box');
+    frame.setAttribute('scale', '0.5 0.5 0.5');
+    frame.setAttribute('material', 'wireframe:true; transparent:true; opacity:0.6');
+    wrapper.appendChild(frame);
+  }
+
+  document.querySelector('a-scene').appendChild(wrapper);
+
+  // Confirm actual world position after attachment
+  setTimeout(() => {
+    const wp = new THREE.Vector3();
+    wrapper.object3D.getWorldPosition(wp);
+    console.log(`[GLB] "${name}" world position confirmed:`, { x: wp.x, y: wp.y, z: wp.z });
+  }, 0);
+
+  return { entity: wrapper, coords };
+}
 
 
+
+      
 
     </script>
   </body>
