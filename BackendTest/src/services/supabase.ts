@@ -7,7 +7,7 @@ dotenv.config();
 // vv supabase
 //const DATABASE_URL = 'postgresql://postgres:Casa8301@db.ujbhmfujhjiuapvegstg.supabase.co:5432/postgres';
 // vv felipe's local db
-const DATABASE_URL="postgresql://$DB_USER:$DB_PASS@$LOCAL_IP:$DB_PORT/$DB_NAME";
+const DATABASE_URL='postgresql://campuslens:campuslens123@172.16.182.122:15432/campuslens'
 
 // Create PostgreSQL connection pool
 export const pool = new Pool({

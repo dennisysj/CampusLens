@@ -6,7 +6,7 @@ echo "🌍 Setting up network access for your Express.js server..."
 # Get the local IP address
 LOCAL_IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -1)
 PORT=${PORT:-3000}
-DB_PORT=5432  # or your actual Postgres local port
+DB_PORT=15432  # or your actual Postgres local port
 DB_USER=campuslens
 DB_PASS=campuslens123
 DB_NAME=campuslens
