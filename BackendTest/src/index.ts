@@ -77,6 +77,21 @@ async function processAssetData(
     const newRecord = rawFrontendRepo.create(recordData);
     const savedRecord = await rawFrontendRepo.save(newRecord) as unknown as RawFrontend;
 
+    // Step 4: Update geometry columns with PostGIS POINT data
+    await AppDataSource.query(
+      `UPDATE public.rawfrontend 
+       SET object_location = ST_SetSRID(ST_MakePoint($1, $2), 4326),
+           user_location = ST_SetSRID(ST_MakePoint($3, $4), 4326)
+       WHERE objectid = $5`,
+      [
+        objectCoords.lon,
+        objectCoords.lat,
+        refinedUser.refinedLon,
+        refinedUser.refinedLat,
+        savedRecord.objectid
+      ]
+    );
+
     console.log('✅ Object position calculated and saved:', savedRecord.objectid);
     console.log(`📍 Refined User: (${refinedUser.refinedLat}, ${refinedUser.refinedLon}) + Vector: [${position.join(', ')}] → Object: (${objectCoords.lat}, ${objectCoords.lon})`);
 
