@@ -4,7 +4,10 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // PostgreSQL connection string
-const DATABASE_URL = 'postgresql://postgres:Casa8301@db.ujbhmfujhjiuapvegstg.supabase.co:5432/postgres';
+// vv supabase
+//const DATABASE_URL = 'postgresql://postgres:Casa8301@db.ujbhmfujhjiuapvegstg.supabase.co:5432/postgres';
+// vv felipe's local db
+const DATABASE_URL="postgresql://$DB_USER:$DB_PASS@$LOCAL_IP:$DB_PORT/$DB_NAME";
 
 // Create PostgreSQL connection pool
 export const pool = new Pool({
