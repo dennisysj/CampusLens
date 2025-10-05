@@ -1,6 +1,18 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { AppDataSource } from '../services/typeorm';
 import Decimal from 'decimal.js';
+import http from 'http';
+import express from 'express';
+const app = express();
+
+const server = http.createServer(app);
+const io = new SocketIOServer(server);
+
+server.listen(3000, () => {
+  console.log('Server listening on port 3000');
+});
+//ws://localhost:3000/socket.io/?EIO=4&transport=websocket
+// WORKS to download, fails if i send from postman
 
 interface ClientInfo {
   id: string;

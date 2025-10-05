@@ -411,7 +411,31 @@ function placeGLBInFront(name='box', withFrame=false, distanceM=2){
 }
 
 
+// Connect to the backend WebSocket server
+import { io } from "socket.io-client";
 
+const socket = io("ws://localhost:3000");
+
+// Listen for events
+socket.on("welcome", (data) => {
+  console.log("Received welcome:", data);
+});
+
+socket.on("position_status", (data) => {
+  console.log("Position status:", data);
+});
+
+socket.on("off_boundaries", (data) => {
+  console.log("Off boundaries:", data);
+});
+
+// Send user position to backend
+function sendPosition(lat, lon) {
+  socket.emit("user_position", { lat, lon });
+}
+
+// Example usage
+sendPosition(40.7128, -74.0060);
       
 
     </script>
