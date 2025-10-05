@@ -79,7 +79,10 @@
         <button class="ui-button" id="textBox-btn" onclick="selectObjectType('textBox')">Text Box</button>
       </div>
       <div class="row">
-        <button class="ui-button" onclick="mode='tap'; setActiveMode()">Tap-to-place (2 m)</button>
+        <button class="ui-button"
+        onclick="mode='tap'; setActiveMode(); placeInFront(2)">
+        Tap-to-place (2 m)
+        </button>
         <button class="ui-button" onclick="mode='gps'; setActiveMode()">GPS pin</button>
       </div>
       <div class="row" id="gps-row" style="display:none">
@@ -95,14 +98,12 @@
     </div>
 
     <div class="instructions">Camera will request permission. Tap to place (Tap mode) or add GPS pin. GPS pins are saved & restored.</div>
-
-    <!-- A-Frame + AR.js -->
+    <!-- A-Frame + AR.js lube 106 works for some reason, it makes the camera clear and scale properly, do not touch-->
     <a-scene
       embedded
       vr-mode-ui="enabled:false"
-      renderer="logarithmicDepthBuffer:true; alpha: true;"
-      <!-- Let AR.js pick stream/display sizes to match device -->
-      arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false">
+      renderer="logarithmicDepthBuffer:true; alpha: true;">
+
 
       <!-- Basic camera (no GPS here; GPS anchor is created per-entity) -->
       <a-camera id="cam" position="0 0 0" look-controls="enabled: false" wasd-controls="enabled: false"></a-camera>
@@ -198,11 +199,6 @@
           newObj = document.createElement(objData.primitive);
           newObj.setAttribute("position", `${positionVec3.x} ${positionVec3.y} ${positionVec3.z}`);
           newObj.setAttribute("visible", true);
-          newObj.setAttribute("material", `color:${objData.color}`);
-          newObj.dataset.baseColor = objData.color;
-          if(currentObjectType==="cube"){ newObj.setAttribute("width",objData.width); newObj.setAttribute("height",objData.height); newObj.setAttribute("depth",objData.depth); }
-          if(currentObjectType==="sphere") newObj.setAttribute("radius",objData.radius);
-          if(currentObjectType==="cylinder"){ newObj.setAttribute("radius",objData.radius); newObj.setAttribute("height",objData.height); }
         }
 
         newObj.setAttribute("id", `object-${objectCounter++}`);
@@ -221,6 +217,7 @@
       // ---------- Placement ----------
       // Tap mode: ~2m ahead (not persisted; AR.js has no world anchors)
       function placeInFront(distanceM=2){
+        console.log("I RANNNN")
         const camEl = document.getElementById('cam');
         const camObj = camEl.object3D;
         const dir = new THREE.Vector3();
@@ -352,6 +349,10 @@
       if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
         console.warn('Camera access requires HTTPS. Use https:// or localhost during dev.');
       }
+
+
+
+
     </script>
   </body>
 </html>
