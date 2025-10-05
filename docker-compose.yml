@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  postgres:
+    build: .
+    container_name: campuslens-postgres
+    environment:
+      POSTGRES_DB: campuslens
+      POSTGRES_USER: campuslens
+      POSTGRES_PASSWORD: campuslens123
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "0.0.0.0:15432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./BackendTest/dataset:/docker-entrypoint-initdb.d/dataset:ro
+    networks:
+      - campuslens-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campuslens -d campuslens"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Optional: pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: campuslens-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@campuslens.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "0.0.0.0:8080:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - campuslens-network
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+
+networks:
+  campuslens-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
