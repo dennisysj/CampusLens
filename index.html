@@ -67,6 +67,8 @@
         <button class="ui-button active" id="cube-btn" onclick="selectObjectType('cube')">Cube</button>
         <button class="ui-button" id="sphere-btn" onclick="selectObjectType('sphere')">Sphere</button>
         <button class="ui-button" id="cylinder-btn" onclick="selectObjectType('cylinder')">Cylinder</button>
+        <button class="ui-button" id="arrow-btn" onclick="selectObjectType('arrow')">Arrow</button>
+        <button class="ui-button" id="textBox-btn" onclick="selectObjectType('textBox')">Text Box</button>
       </div>
       <div>
         <button class="ui-button delete" onclick="deleteSelectedObject()">Delete Selected</button>
@@ -79,7 +81,7 @@
 
     <!-- Instructions -->
     <div class="instructions">
-      Tap to Place
+      Tap to Place 
     </div>
 
     <!-- live camera feed -->
@@ -89,10 +91,10 @@
     <a-scene embedded>
       <!-- enables mouse-based raycasting onto entities -->
       <a-entity cursor="rayOrigin: mouse"
-                raycaster="objects: a-box, a-sphere, a-cylinder, #ground"></a-entity>
+                raycaster="objects: a-box, a-sphere, a-cylinder, a-entity[id^='object-'], #ground"></a-entity>
 
       <!-- invisible ground plane for placement - covers entire viewport -->
-      <a-plane id="ground" rotation="-90 0 0" width="100" height="100" 
+      <a-plane id="ground" rotation="-45 0 0" width="100" height="100" 
                position="0 0 0" material="opacity: 0; transparent: true" 
                visible="true"></a-plane>
 
@@ -120,12 +122,79 @@
           color: 'green',
           radius: 0.3,
           height: 0.6
-        }
+        },
+        arrow: {
+          type: "group",
+          parts: [
+            {
+              primitive: "a-cylinder",
+              color: "#F00",
+              height: 0.6,
+              radius: 0.05,
+              position: "0 0 0",
+            },
+            {
+              primitive: "a-cone",
+              color: "#F00",
+              height: 0.3,
+              radiusBottom: 0.12,
+              position: "0 0.45 0",
+            },
+          ],
+        },
+        textBox: {
+          type: "group",
+          parts: [
+            {
+              primitive: "a-plane",
+              color: "#FFFFFF",
+              width: 1.5,
+              height: 0.6,
+              position: "0 0 0",
+             
+            },
+            {
+              primitive: "a-entity",
+              text: "value: Example Text; color: black; width: 2; align: center",
+              position: "0 0.25 0",
+             
+            },
+            {
+              primitive: "a-sphere",
+              radius: 0.05,
+              color: "red",
+              position: "0.75 0.3 0.02",
+              class: "resize-handle",
+            },
+            {
+              primitive: "a-sphere",
+              radius: 0.05,
+              color: "red",
+              position: "-0.75 0.3 0.02",
+              class: "resize-handle",
+            },
+            {
+              primitive: "a-sphere",
+              radius: 0.05,
+              color: "red",
+              position: "0.75 -0.3 0.02",
+              class: "resize-handle",
+            },
+            {
+              primitive: "a-sphere",
+              radius: 0.05,
+              color: "red",
+              position: "-0.75 -0.3 0.02",
+              class: "resize-handle",
+            },
+          ],
+        },
       };
 
       let currentObjectType = 'cube';
       let selectedObject = null;
       let objectCounter = 0;
+      let isResizing = false;
 
       // Start camera feed
       navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
@@ -155,77 +224,200 @@
         // Create new object
         function createObject(position) {
           const objData = objectTypes[currentObjectType];
-          const newObj = document.createElement(objData.primitive);
-          
-          // Set basic attributes
-          newObj.setAttribute('position', `${position.x} ${position.y} ${position.z}`);
-          newObj.setAttribute('visible', true);
-          newObj.setAttribute('material', `color: ${objData.color}`);
-          
-          // Store base color for later restoration
-          newObj.dataset.baseColor = objData.color;
-          
-          // Set specific geometry attributes
-          if (currentObjectType === 'cube') {
-            newObj.setAttribute('width', objData.width);
-            newObj.setAttribute('height', objData.height);
-            newObj.setAttribute('depth', objData.depth);
-          } else if (currentObjectType === 'sphere') {
-            newObj.setAttribute('radius', objData.radius);
-          } else if (currentObjectType === 'cylinder') {
-            newObj.setAttribute('radius', objData.radius);
-            newObj.setAttribute('height', objData.height);
+          let newObj;
+
+          if (objData.type === "group") {
+            newObj = document.createElement("a-entity");
+            newObj.setAttribute(
+              "position",
+              `${position.x} ${position.y} ${position.z}`
+            );
+
+            objData.parts.forEach((part) => {
+              const partEl = document.createElement(part.primitive);
+
+              for (const [attr, value] of Object.entries(part)) {
+                if (attr === "primitive" || attr === "position") continue;
+
+                if (attr === "text") {
+                  const textProps = {};
+                  value.split(";").forEach((kv) => {
+                    if (!kv.trim()) return;
+                    const [k, v] = kv.split(":").map((s) => s.trim());
+                    textProps[k] = isNaN(v) ? v : parseFloat(v);
+                  });
+                  partEl.setAttribute("text", textProps);
+                } else {
+                  partEl.setAttribute(attr, value);
+                }
+              }
+
+              if (part.position) partEl.setAttribute("position", part.position);
+              newObj.appendChild(partEl);
+            });
+
+            if (currentObjectType === "textBox") {
+              makeTextBoxResizable(newObj);
+            }
+          } else {
+            newObj = document.createElement(objData.primitive);
+            newObj.setAttribute(
+              "position",
+              `${position.x} ${position.y} ${position.z}`
+            );
+            newObj.setAttribute("visible", true);
+            newObj.setAttribute("material", `color: ${objData.color}`);
+
+            // Store base color for later restoration
+            newObj.dataset.baseColor = objData.color;
+
+            if (currentObjectType === "cube") {
+              newObj.setAttribute("width", objData.width);
+              newObj.setAttribute("height", objData.height);
+              newObj.setAttribute("depth", objData.depth);
+            } else if (currentObjectType === "sphere") {
+              newObj.setAttribute("radius", objData.radius);
+            } else if (currentObjectType === "cylinder") {
+              newObj.setAttribute("radius", objData.radius);
+              newObj.setAttribute("height", objData.height);
+            }
           }
-          
-          // Add unique ID and click handler
-          newObj.setAttribute('id', `object-${objectCounter++}`);
-          newObj.addEventListener('click', selectObject);
-          
+
+          newObj.setAttribute("id", `object-${objectCounter++}`);
+          newObj.addEventListener("click", selectObject);
+
           // Log object coordinates
           console.log(`📍 Object placed at coordinates: x=${position.x.toFixed(2)}, y=${position.y.toFixed(2)}, z=${position.z.toFixed(2)}`);
           console.log(`🎯 Object type: ${currentObjectType}, ID: ${newObj.id}`);
-          console.log("HELLLLOOO WORLD!")
-          
+          console.log("HELLLLOOO WORLD!");
+
           sceneEl.appendChild(newObj);
           updateObjectCount();
           return newObj;
         }
 
-        // Object placement handler with proper canvas-relative coordinates
+        function makeTextBoxResizable(textBoxEntity) {
+          const plane = textBoxEntity.querySelector("a-plane");
+          const text = textBoxEntity.querySelector("a-entity[text]");
+          const handles = Array.from(textBoxEntity.querySelectorAll(".resize-handle"));
+
+          // Store references
+          textBoxEntity.userData = {
+            plane: plane,
+            text: text,
+            handles: handles
+          };
+        }
+
+        // Object placement handler
         function placeObject(event) {
-          console.log('Place object called!');
+          if (isResizing) return;
           
-          // Prevent event bubbling
-          event.stopPropagation();
-          
-          // Get client coords
-          const x = (event.touches?.[0]?.clientX ?? event.clientX);
-          const y = (event.touches?.[0]?.clientY ?? event.clientY);
-
-          console.log('Click position:', x, y);
-
-          // Convert to canvas-relative NDC
+          // Check if we clicked on a resize handle first
+          const x = event.touches?.[0]?.clientX ?? event.clientX;
+          const y = event.touches?.[0]?.clientY ?? event.clientY;
           const rect = canvas.getBoundingClientRect();
           const mouse = new THREE.Vector2(
             ((x - rect.left) / rect.width) * 2 - 1,
             -((y - rect.top) / rect.height) * 2 + 1
           );
 
-          console.log('Canvas-relative mouse:', mouse);
-
           const raycaster = new THREE.Raycaster();
           raycaster.setFromCamera(mouse, threeCamera);
 
-          const hits = raycaster.intersectObject(ground.object3D, true);
-          console.log('Raycast hits:', hits.length);
-          
-          if (hits.length) {
-            const p = hits[0].point;
-            console.log('Hit point:', p);
-            createObject(p);
-          } else {
-            console.log('No hit detected - click not on ground plane');
+          // Check for handle hits first
+          const allHandles = [];
+          sceneEl.querySelectorAll(".resize-handle").forEach(h => {
+            if (h.object3D) allHandles.push(h.object3D);
+          });
+
+          if (allHandles.length > 0) {
+            const handleHits = raycaster.intersectObjects(allHandles, true);
+            if (handleHits.length > 0) {
+              // Found a handle, start resizing
+              const handleObj = handleHits[0].object;
+              // Find the A-Frame element
+              let handleEl = null;
+              sceneEl.querySelectorAll(".resize-handle").forEach(h => {
+                if (h.object3D === handleObj || h.object3D.children.includes(handleObj)) {
+                  handleEl = h;
+                }
+              });
+              
+              if (handleEl) {
+                const textBox = handleEl.parentElement;
+                if (textBox && textBox.userData) {
+                  startResizeFromHandle(event, handleEl, textBox);
+                  return;
+                }
+              }
+            }
           }
+
+          // No handle hit, proceed with placement
+          event.stopPropagation();
+          const hits = raycaster.intersectObject(ground.object3D, true);
+          if (hits.length) {
+            createObject(hits[0].point);
+          }
+        }
+
+        function startResizeFromHandle(event, handleEl, textBoxEntity) {
+          event.stopPropagation();
+          if (event.preventDefault) event.preventDefault();
+          
+          isResizing = true;
+          
+          const plane = textBoxEntity.userData.plane;
+          const text = textBoxEntity.userData.text;
+          const handles = textBoxEntity.userData.handles;
+
+          const startX = event.clientX || event.touches?.[0]?.clientX || 0;
+          const startY = event.clientY || event.touches?.[0]?.clientY || 0;
+          const startWidth = parseFloat(plane.getAttribute("width"));
+          const startHeight = parseFloat(plane.getAttribute("height"));
+          
+          const handlePos = handleEl.getAttribute("position").split(" ").map(parseFloat);
+          const isRight = handlePos[0] > 0;
+          const isTop = handlePos[1] > 0;
+
+          console.log("Resize started", {isRight, isTop});
+
+          function onMove(e) {
+            const currentX = e.clientX || e.touches?.[0]?.clientX || startX;
+            const currentY = e.clientY || e.touches?.[0]?.clientY || startY;
+
+            const dx = (currentX - startX) * 0.005;
+            const dy = (startY - currentY) * 0.005;
+
+            const newWidth = Math.max(0.3, startWidth + dx * (isRight ? 2 : -2));
+            const newHeight = Math.max(0.3, startHeight + dy * (isTop ? 2 : -2));
+
+            plane.setAttribute("width", newWidth);
+            plane.setAttribute("height", newHeight);
+            text.setAttribute("scale", `${newWidth / 3} ${newHeight / 3} 0.5`);
+
+            handles.forEach((h) => {
+              const pos = h.getAttribute("position").split(" ").map(parseFloat);
+              const posX = pos[0] > 0 ? newWidth / 2 : -newWidth / 2;
+              const posY = pos[1] > 0 ? newHeight / 2 : -newHeight / 2;
+              h.setAttribute("position", `${posX} ${posY} 0.02`);
+            });
+          }
+
+          function onEnd(e) {
+            isResizing = false;
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onEnd);
+            window.removeEventListener("touchmove", onMove);
+            window.removeEventListener("touchend", onEnd);
+            console.log("Resize ended");
+          }
+
+          window.addEventListener("mousemove", onMove);
+          window.addEventListener("mouseup", onEnd);
+          window.addEventListener("touchmove", onMove, { passive: false });
+          window.addEventListener("touchend", onEnd);
         }
 
         // Object selection handler
@@ -260,16 +452,21 @@
 
         // Clear all objects
         function clearAllObjects() {
-          const objects = sceneEl.querySelectorAll('a-box, a-sphere, a-cylinder');
-          objects.forEach(obj => sceneEl.removeChild(obj));
+          const objects = sceneEl.querySelectorAll(
+            "a-box, a-sphere, a-cylinder, a-entity[id^='object-']"
+          );
+          objects.forEach((obj) => sceneEl.removeChild(obj));
           selectedObject = null;
           updateObjectCount();
         }
 
         // Update object counter
         function updateObjectCount() {
-          const count = sceneEl.querySelectorAll('a-box, a-sphere, a-cylinder').length;
-          document.getElementById('object-count').textContent = count;
+          // Only count objects with IDs starting with 'object-' that are direct children of scene
+          const objects = Array.from(sceneEl.children).filter(child => 
+            child.id && child.id.startsWith('object-')
+          );
+          document.getElementById('object-count').textContent = objects.length;
         }
 
         // Make functions globally available
