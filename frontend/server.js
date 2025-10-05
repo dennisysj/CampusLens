@@ -1,12 +1,27 @@
 const express = require('express');
+const path = require('path');
 const app = express();
 
-app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/index.html');
-});
-
+// Serve static files from public directory
 app.use(express.static('public'));
 
-app.listen(3000, () => {
-  console.log('Server is running on port 3000. http://localhost:3000');
+// Serve the main HTML file
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
+
+// Handle all other routes by serving the main HTML (for SPA behavior)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Export for Vercel
+module.exports = app;
+
+// For local development
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}. http://localhost:${PORT}`);
+  });
+}
