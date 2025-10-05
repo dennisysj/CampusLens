@@ -163,7 +163,7 @@ const getNearbyAssets = async (lat: number, lon: number, radiusMeters: number = 
 };
 
 // RenderElements function - now queries database for nearby assets
-const RenderElements = async (clientId: string, position: {refined_lon: number, refined_lat: number}) => {
+const RenderElements = async (clientId: string, position: {refined_lat: number, refined_lon: number}) => {
   console.log(`🎯 RenderElements called for client ${clientId} at position:`, position);
   
   try {

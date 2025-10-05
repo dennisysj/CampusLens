@@ -72,12 +72,12 @@
     <!-- UI -->
     <div class="ui-panel">
       <div>
-        <button class="ui-button" onclick="placeGLBInFront('fox', true)">Place Box (GLB)</button>
+        <button class="ui-button" onclick="placeGLBInFront('duck', true)">Place duck (GLB)</button>
 
-        <button class="ui-button active" id="cube-btn" onclick="selectObjectType('cube')">Cube</button>
-        <button class="ui-button" id="sphere-btn" onclick="selectObjectType('sphere')">Sphere</button>
-        <button class="ui-button" id="cylinder-btn" onclick="selectObjectType('cylinder')">Cylinder</button>
-        <button class="ui-button" id="arrow-btn" onclick="selectObjectType('arrow')">Arrow</button>
+        <button class="ui-button active" id="cube-btn" onclick="selectObjectType('box')">Box</button>
+        <button class="ui-button" id="sphere-btn" onclick="selectObjectType('avocado')">Avocado</button>
+        <button class="ui-button" id="cylinder-btn" onclick="selectObjectType('piano')">Piano</button>
+        <button class="ui-button" id="arrow-btn" onclick="selectObjectType('ghost')">ghost</button>
         <button class="ui-button" id="textBox-btn" onclick="selectObjectType('textBox')">Text Box</button>
       </div>
       <div class="row">
@@ -354,13 +354,19 @@
 
       //test
       // Sample GLB catalog
-const GLB = {
-  duck: { url:'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/Duck/glTF-Binary/Duck.glb', scale:'0.02 0.02 0.02' },
-  fox:  { url:'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/Fox/glTF-Binary/Fox.glb',   scale:'0.03 0.03 0.03', animation:true },
-  box:  { url:'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/Box/glTF-Binary/Box.glb',  scale:'0.5 0.5 0.5' },
+const GLB = { 
+  duck: { url:'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Duck/glTF-Binary/Duck.glb', scale:'0.02 0.02 0.02' },
+  //fox:  { url:'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/Fox/glTF-Binary/Fox.glb',   scale:'0.03 0.03 0.03', animation:true },
+  
+  box:  { url:'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Box/glTF-Binary/Box.glb',  scale:'0.5 0.5 0.5' },
+        //box:  { url:'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/Box/glTF-Binary/Box.glb',  scale:'0.5 0.5 0.5' },
+  avocado: { url:'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Avocado/glTF-Binary/Avocado.glb', scale:'0.05 0.05 0.05' },
+  piano: {url: 'https://drive.google.com/file/d/1vdhjhPHiFXlA4LPk_rR87ScEynU_Bxy4/view?usp=sharing'},
+  ghost: {url: 'https://drive.google.com/file/d/1gFdEKyyKw1BEt3z1mIUvm3bkBzxizMVd/view?usp=sharing'}
+  
 };
 
-function placeGLBInFront(name='box', withFrame=false, distanceM=2){
+function placeGLBInFront(name='duck', withFrame=false, distanceM=2){
   const spec = GLB[name];
   if (!spec) { console.warn('Unknown GLB key:', name); return null; }
 
@@ -413,8 +419,10 @@ function placeGLBInFront(name='box', withFrame=false, distanceM=2){
 
 // Connect to the backend WebSocket server
 import { io } from "socket.io-client";
-
 const socket = io("ws://localhost:3000");
+
+socket.on('connect', () => {
+  console.log('Connected:', socket.id); });
 
 // Listen for events
 socket.on("welcome", (data) => {
