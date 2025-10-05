@@ -21,7 +21,7 @@
         height: 100dvh !important;
         z-index: 1 !important;
       }
-      /* Camera video sizing (avoid stretch) */
+      /* Let AR.js video fill safely without distortion (use 'cover' to crop) */
       video[playsinline] {
         position: fixed;
         inset: 0;
@@ -78,19 +78,11 @@
         <button class="ui-button" id="arrow-btn" onclick="selectObjectType('arrow')">Arrow</button>
         <button class="ui-button" id="textBox-btn" onclick="selectObjectType('textBox')">Text Box</button>
       </div>
-
-      <!-- GLB presets (no downloads; public CDNs) -->
       <div class="row">
-        <button class="ui-button" id="glb-duck-btn" onclick="selectObjectType('glb_duck')">GLB: Duck</button>
-        <button class="ui-button" id="glb-fox-btn" onclick="selectObjectType('glb_fox')">GLB: Fox</button>
-        <button class="ui-button" id="glb-helmet-btn" onclick="selectObjectType('glb_helmet')">GLB: Helmet</button>
-        <button class="ui-button" id="glb-box-btn" onclick="selectObjectType('glb_box')">GLB: Box</button>
-        <button class="ui-button" id="glb-avocado-btn" onclick="selectObjectType('glb_avocado')">GLB: Avocado</button>
-        <button class="ui-button" id="glb-cesium-btn" onclick="selectObjectType('glb_cesiumman')">GLB: CesiumMan</button>
-      </div>
-
-      <div class="row">
-        <button class="ui-button" onclick="mode='tap'; setActiveMode(); placeInFront(2)">Tap-to-place (2 m)</button>
+        <button class="ui-button"
+        onclick="mode='tap'; setActiveMode(); placeInFront(2)">
+        Tap-to-place (2 m)
+        </button>
         <button class="ui-button" onclick="mode='gps'; setActiveMode()">GPS pin</button>
       </div>
       <div class="row" id="gps-row" style="display:none">
@@ -106,21 +98,17 @@
     </div>
 
     <div class="instructions">Camera will request permission. Tap to place (Tap mode) or add GPS pin. GPS pins are saved & restored.</div>
-
-    <!-- A-Frame + AR.js -->
+    <!-- A-Frame + AR.js-->
     <a-scene
       embedded
       vr-mode-ui="enabled:false"
-      renderer="logarithmicDepthBuffer:true; alpha: true">
+      renderer="logarithmicDepthBuffer:true; alpha: true;">
 
-      <!-- Location-based camera (needed for gps-new-entity-place) -->
-      <a-camera id="cam"
-        gps-new-camera="gpsMinDistance:5"
-        position="0 0 0"
-        look-controls="enabled: false"
-        wasd-controls="enabled: false"></a-camera>
 
-      <!-- Optional helper plane -->
+      <!-- Basic camera (no GPS here; GPS anchor is created per-entity) -->
+      <a-camera id="cam" position="0 0 0" look-controls="enabled: false" wasd-controls="enabled: false"></a-camera>
+
+      <!-- Optional helper plane for editing (not real plane detection) -->
       <a-plane id="edit-plane" rotation="-90 0 0" width="200" height="200"
                position="0 0 -4" visible="false"></a-plane>
 
@@ -147,42 +135,22 @@
         iosPerm.remove();
       };
 
-      // ---------- GLB URLs ----------
-      const GLB = {
-        box:      { url:'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/Box/glTF-Binary/Box.glb',           scale:'0.5 0.5 0.5' },
-        duck:     { url:'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/Duck/glTF-Binary/Duck.glb',         scale:'0.02 0.02 0.02' },
-        fox:      { url:'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/Fox/glTF-Binary/Fox.glb',           scale:'0.03 0.03 0.03', animation:true },
-        helmet:   { url:'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/DamagedHelmet/glTF-Binary/DamagedHelmet.glb', scale:'2 2 2' },
-        avocado:  { url:'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/Avocado/glTF-Binary/Avocado.glb',   scale:'0.03 0.03 0.03' },
-        cesiumman:{ url:'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/CesiumMan/glTF-Binary/CesiumMan.glb', scale:'1 1 1', animation:true }
-      };
-
       // ---------- Object definitions ----------
       const objectTypes = {
-        // primitives (your originals)
-        cube:{kind:'primitive', primitive:'a-box',color:'orange',width:0.5,height:0.5,depth:0.5},
-        sphere:{kind:'primitive', primitive:'a-sphere',color:'blue',radius:0.3},
-        cylinder:{kind:'primitive', primitive:'a-cylinder',color:'green',radius:0.3,height:0.6},
-        arrow:{kind:'group',parts:[
+        cube:{primitive:'a-box',color:'orange',width:0.5,height:0.5,depth:0.5},
+        sphere:{primitive:'a-sphere',color:'blue',radius:0.3},
+        cylinder:{primitive:'a-cylinder',color:'green',radius:0.3,height:0.6},
+        arrow:{type:"group",parts:[
           {primitive:"a-cylinder",color:"#F00",height:0.6,radius:0.05,position:"0 0 0"},
           {primitive:"a-cone",color:"#F00",height:0.3,radiusBottom:0.12,position:"0 0.45 0"}]},
-        textBox:{kind:'group',parts:[
+        textBox:{type:"group",parts:[
           {primitive:"a-plane",color:"#FFFFFF",width:1.5,height:0.6,position:"0 0 0"},
           {primitive:"a-entity",text:"value: Example Text; color: black; width: 2; align: center",position:"0 0.25 0"},
           {primitive:"a-sphere",radius:0.05,color:"red",position:"0.75 0.3 0.02",class:"resize-handle"},
           {primitive:"a-sphere",radius:0.05,color:"red",position:"-0.75 0.3 0.02",class:"resize-handle"},
           {primitive:"a-sphere",radius:0.05,color:"red",position:"0.75 -0.3 0.02",class:"resize-handle"},
-          {primitive:"a-sphere",radius:0.05,color:"red",position:"-0.75 -0.3 0.02",class:"resize-handle"}]},
-
-        // GLB models
-        glb_box:{kind:'glb', url:GLB.box.url, scale:GLB.box.scale},
-        glb_duck:{kind:'glb', url:GLB.duck.url, scale:GLB.duck.scale},
-        glb_fox:{kind:'glb', url:GLB.fox.url, scale:GLB.fox.scale, animation:true},
-        glb_helmet:{kind:'glb', url:GLB.helmet.url, scale:GLB.helmet.scale},
-        glb_avocado:{kind:'glb', url:GLB.avocado.url, scale:GLB.avocado.scale},
-        glb_cesiumman:{kind:'glb', url:GLB.cesiumman.url, scale:GLB.cesiumman.scale, animation:true}
+          {primitive:"a-sphere",radius:0.05,color:"red",position:"-0.75 -0.3 0.02",class:"resize-handle"}]}
       };
-
       let currentObjectType='cube', selectedObject=null, objectCounter=0, isResizing=false;
 
       window.selectObjectType = (t)=>{
@@ -203,21 +171,13 @@
       const removeRecordById = (id) => { saveRecords(loadRecords().filter(x => x.id !== id)); };
       const clearAllRecords = () => localStorage.removeItem(STORAGE_KEY);
 
-      // ---------- Build object (primitive/group/GLB) ----------
+      // ---------- Build object ----------
       function buildObject(positionVec3){
         const sceneEl = document.querySelector('a-scene');
         const objData = objectTypes[currentObjectType];
         let newObj;
 
-        if (objData?.kind === 'glb') {
-          newObj = document.createElement("a-entity");
-          newObj.setAttribute("position", `${positionVec3.x} ${positionVec3.y} ${positionVec3.z}`);
-          newObj.setAttribute("gltf-model", objData.url);
-          if (objData.scale) newObj.setAttribute("scale", objData.scale);
-          if (objData.rotation) newObj.setAttribute("rotation", objData.rotation);
-          if (objData.animation) newObj.setAttribute("animation-mixer", "");
-          newObj.dataset.isGlb = "1";
-        } else if (objData?.kind === "group"){
+        if (objData.type==="group"){
           newObj = document.createElement("a-entity");
           newObj.setAttribute("position", `${positionVec3.x} ${positionVec3.y} ${positionVec3.z}`);
           objData.parts.forEach(part=>{
@@ -235,8 +195,7 @@
             newObj.appendChild(el);
           });
           if(currentObjectType==="textBox") makeTextBoxResizable(newObj);
-        } else {
-          // primitive
+        }else{
           newObj = document.createElement(objData.primitive);
           newObj.setAttribute("position", `${positionVec3.x} ${positionVec3.y} ${positionVec3.z}`);
           newObj.setAttribute("visible", true);
@@ -256,8 +215,9 @@
       }
 
       // ---------- Placement ----------
-      // Tap mode: ~2m ahead (not persisted; AR.js has no true world anchors)
+      // Tap mode: ~2m ahead (not persisted; AR.js has no world anchors)
       function placeInFront(distanceM=2){
+        console.log("I RANNNN")
         const camEl = document.getElementById('cam');
         const camObj = camEl.object3D;
         const dir = new THREE.Vector3();
@@ -281,12 +241,13 @@
         anchor.setAttribute('id', anchorId);
 
         // build the visual as a child at local (0,0,0)
+        const childType = type;
         const tmpType = currentObjectType;
-        currentObjectType = type;
+        currentObjectType = childType;
         const child = buildObject(new THREE.Vector3(0,0,0));
         currentObjectType = tmpType;
-
         anchor.appendChild(child);
+
         sceneEl.appendChild(anchor);
 
         // Persist this anchor
@@ -310,15 +271,20 @@
         if (el.parentElement && el.parentElement.hasAttribute('gps-new-entity-place')) {
           el = el.parentElement;
         }
-        // remove highlight from previous (only if it was a direct primitive geometry)
-        if (selectedObject && !selectedObject.hasAttribute('gps-new-entity-place') && !selectedObject.dataset?.isGlb) {
+        // remove highlight from previous (only if it was a direct geometry)
+        if (selectedObject && !selectedObject.hasAttribute('gps-new-entity-place')) {
           selectedObject.setAttribute('material', 'color:'+getOriginalColor(selectedObject));
         }
         selectedObject = el;
 
-        // highlight only primitives; GLBs keep their own materials
-        if (!selectedObject.hasAttribute('gps-new-entity-place') && !selectedObject.dataset?.isGlb) {
+        // highlight geometry child (anchors by themselves may have no material)
+        if (!selectedObject.hasAttribute('gps-new-entity-place')) {
           selectedObject.setAttribute('material','color:red');
+        } else {
+          const geomChild = selectedObject.querySelector('a-box, a-sphere, a-cylinder, a-entity:not([gps-new-entity-place])');
+          if (geomChild && geomChild.dataset?.baseColor) {
+            geomChild.setAttribute('material','color:red');
+          }
         }
       }
       function getOriginalColor(obj){ return obj.dataset?.baseColor || 'gray'; }
@@ -383,6 +349,10 @@
       if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
         console.warn('Camera access requires HTTPS. Use https:// or localhost during dev.');
       }
+
+
+
+
     </script>
   </body>
 </html>
