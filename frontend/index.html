@@ -44,19 +44,23 @@
       <div class="object-counter">Objects: <span id="object-count">0</span></div>
     </div>
 
-    <div class="instructions">Tap screen to place (in Tap mode). iOS: tap “Enable Motion” if heading seems stuck.</div>
+    <div class="instructions">Loading camera... Please allow camera access when prompted.</div>
+    
+    <!-- Camera permission button -->
+    <button id="cameraPerm" style="position:fixed;bottom:50px;right:12px;z-index:999;background:#4CAF50;border:none;color:#fff;padding:10px 15px;border-radius:5px;cursor:pointer;">Enable Camera</button>
 
     <!-- A-Frame + AR.js -->
     <a-scene
       embedded
       vr-mode-ui="enabled:false"
       renderer="logarithmicDepthBuffer:true"
-      arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false">
+      arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: true; detectionMode: mono_and_matrix; matrixCodeType: 3x3;">
 
       <!-- Location-enabled camera (new API) -->
       <a-camera id="cam"
         gps-new-camera="gpsMinDistance: 5; positionMinAccuracy: 100"
-        arjs-device-orientation-controls="smoothingFactor:0.1">
+        arjs-device-orientation-controls="smoothingFactor:0.1"
+        wasd-controls="enabled: false">
       </a-camera>
 
       <!-- (Optional) invisible “edit plane” so your existing raycaster can hit something.
@@ -67,6 +71,11 @@
       <!-- Mouse cursor for desktop debugging -->
       <a-entity cursor="rayOrigin: mouse"
                 raycaster="objects: a-box, a-sphere, a-cylinder, a-entity[id^='object-']"></a-entity>
+
+      <!-- Test AR marker for debugging -->
+      <a-marker-camera preset="hiro">
+        <a-box position="0 0.5 0" material="color: yellow;"></a-box>
+      </a-marker-camera>
     </a-scene>
 
     <!-- iOS motion permission -->
@@ -241,6 +250,63 @@
 
       // ---------- Demo: seed a GPS pin (edit these to test outdoors) ----------
       // addAtLatLng(49.2827, -123.1207); // ← uncomment to spawn one at these coords
+
+      // ---------- Camera initialization and error handling ----------
+      document.addEventListener('DOMContentLoaded', function() {
+        const scene = document.querySelector('a-scene');
+        const cameraPermBtn = document.getElementById('cameraPerm');
+        
+        // Check if we're on HTTPS (required for camera access)
+        if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+          alert('Camera access requires HTTPS. Please use https:// or localhost');
+        }
+
+        // Handle AR.js initialization
+        scene.addEventListener('arjs-video-loaded', function() {
+          console.log('AR.js video loaded successfully');
+          document.querySelector('.instructions').textContent = 'Camera ready! Tap to place objects.';
+          cameraPermBtn.style.display = 'none';
+        });
+
+        scene.addEventListener('arjs-video-error', function() {
+          console.error('AR.js video error');
+          document.querySelector('.instructions').textContent = 'Camera error. Click "Enable Camera" button.';
+          cameraPermBtn.style.display = 'block';
+        });
+
+        // Camera permission button handler
+        cameraPermBtn.onclick = function() {
+          if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: true })
+              .then(function(stream) {
+                console.log('Camera permission granted');
+                document.querySelector('.instructions').textContent = 'Camera permission granted. Reloading...';
+                setTimeout(() => location.reload(), 1000);
+              })
+              .catch(function(error) {
+                console.error('Camera permission denied:', error);
+                document.querySelector('.instructions').textContent = 'Camera permission denied. Please allow camera access.';
+              });
+          } else {
+            document.querySelector('.instructions').textContent = 'Camera not supported on this device.';
+          }
+        };
+
+        // Auto-request camera permissions
+        setTimeout(() => {
+          if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: true })
+              .then(function(stream) {
+                console.log('Camera permission granted automatically');
+                cameraPermBtn.style.display = 'none';
+              })
+              .catch(function(error) {
+                console.log('Camera permission not granted automatically, showing button');
+                cameraPermBtn.style.display = 'block';
+              });
+          }
+        }, 1000);
+      });
     </script>
   </body>
 </html>
