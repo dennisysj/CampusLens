@@ -12,7 +12,7 @@ interface ClientInfo {
   };
   initialPosition?: {
     refined_lon: number;
-    refined_lat: number;
+    refined_lat: number;  
   };
   state: 'accept' | 'ok' | 'off_boundaries';
 }

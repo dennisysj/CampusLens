@@ -10,11 +10,9 @@ const DATABASE_URL = 'postgresql://campuslens:campuslens123@localhost:15432/camp
 export const AppDataSource = new DataSource({
   type: 'postgres',
   url: DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  },
+  ssl: false, // Disable SSL for local development
   entities: [__dirname + '/../entities/*.ts'],
-  synchronize: true, // Auto-create tables
+  synchronize: true, // Auto-create/update tables
   logging: false,
 });
 
@@ -22,7 +20,7 @@ export const AppDataSource = new DataSource({
 export const initializeDatabase = async () => {
   try {
     await AppDataSource.initialize();
-    console.log('✅ TypeORM connected to Supabase successfully');
+    console.log('✅ TypeORM connected to PostgreSQL successfully');
     return true;
   } catch (error) {
     console.error('❌ TypeORM connection failed:', error);
