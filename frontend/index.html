@@ -91,10 +91,10 @@
         <button class="ui-button delete" onclick="deleteSelectedObject()">Delete Selected</button>
         <button class="ui-button delete" onclick="clearAllObjects()">Clear All</button>
       </div>
-      <div class="object-counter">Objects: <span id="object-count">0</span></div>
+      <div class="object-counter">Pins: <span id="object-count">0</span></div>
     </div>
 
-    <div class="instructions">Camera will request permission. Tap to place (Tap mode) or add GPS pin.</div>
+    <div class="instructions">Camera will request permission. Tap to place (Tap mode) or add GPS pin. GPS pins are saved & restored.</div>
 
     <!-- A-Frame + AR.js -->
     <a-scene
@@ -158,6 +158,18 @@
         const btn=document.getElementById(t+'-btn'); if(btn) btn.classList.add('active');
       };
 
+      // ---------- Persistence (localStorage) ----------
+      const STORAGE_KEY = 'ar_objects_v1'; // records: { id, type, lat, lon }
+
+      const loadRecords = () => {
+        try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+        catch { return []; }
+      };
+      const saveRecords = (recs) => localStorage.setItem(STORAGE_KEY, JSON.stringify(recs));
+      const addRecord = (rec) => { const r = loadRecords(); r.push(rec); saveRecords(r); };
+      const removeRecordById = (id) => { saveRecords(loadRecords().filter(x => x.id !== id)); };
+      const clearAllRecords = () => localStorage.removeItem(STORAGE_KEY);
+
       // ---------- Build object ----------
       function buildObject(positionVec3){
         const sceneEl = document.querySelector('a-scene');
@@ -196,7 +208,6 @@
         newObj.setAttribute("id", `object-${objectCounter++}`);
         newObj.addEventListener("click", selectObject);
         sceneEl.appendChild(newObj);
-        updateObjectCount();
         return newObj;
       }
 
@@ -208,6 +219,7 @@
       }
 
       // ---------- Placement ----------
+      // Tap mode: ~2m ahead (not persisted; AR.js has no world anchors)
       function placeInFront(distanceM=2){
         const camEl = document.getElementById('cam');
         const camObj = camEl.object3D;
@@ -218,17 +230,32 @@
         const target = pos.add(dir.multiplyScalar(distanceM));
         target.y += 0.2;
         buildObject(target);
+        updateObjectCount(); // do not persist
       }
 
-      function addAtLatLng(lat, lon){
+      // GPS mode: persist lat/lon so it can be restored next time
+      function addAtLatLng(lat, lon, typeOverride){
         const sceneEl = document.querySelector('a-scene');
-        const anchor = document.createElement('a-entity');
-        anchor.setAttribute('gps-new-entity-place', `latitude:${lat}; longitude:${lon}`);
-        anchor.setAttribute('id', `object-${objectCounter++}`);
+        const type = typeOverride || currentObjectType;
 
+        const anchor = document.createElement('a-entity');
+        const anchorId = `object-${objectCounter++}`;
+        anchor.setAttribute('gps-new-entity-place', `latitude:${lat}; longitude:${lon}`);
+        anchor.setAttribute('id', anchorId);
+
+        // build the visual as a child at local (0,0,0)
+        const childType = type;
+        const tmpType = currentObjectType;
+        currentObjectType = childType;
         const child = buildObject(new THREE.Vector3(0,0,0));
+        currentObjectType = tmpType;
         anchor.appendChild(child);
+
         sceneEl.appendChild(anchor);
+
+        // Persist this anchor
+        addRecord({ id: anchorId, type, lat, lon });
+
         updateObjectCount();
         return anchor;
       }
@@ -242,37 +269,79 @@
       // ---------- Selection / deletion ----------
       function selectObject(e){
         e.stopPropagation();
-        if(selectedObject) selectedObject.setAttribute('material', 'color:'+getOriginalColor(selectedObject));
-        selectedObject = e.currentTarget;
-        selectedObject.setAttribute('material','color:red');
+        // If you clicked a child inside a GPS anchor, select the anchor
+        let el = e.currentTarget;
+        if (el.parentElement && el.parentElement.hasAttribute('gps-new-entity-place')) {
+          el = el.parentElement;
+        }
+        // remove highlight from previous (only if it was a direct geometry)
+        if (selectedObject && !selectedObject.hasAttribute('gps-new-entity-place')) {
+          selectedObject.setAttribute('material', 'color:'+getOriginalColor(selectedObject));
+        }
+        selectedObject = el;
+
+        // highlight geometry child (anchors by themselves may have no material)
+        if (!selectedObject.hasAttribute('gps-new-entity-place')) {
+          selectedObject.setAttribute('material','color:red');
+        } else {
+          const geomChild = selectedObject.querySelector('a-box, a-sphere, a-cylinder, a-entity:not([gps-new-entity-place])');
+          if (geomChild && geomChild.dataset?.baseColor) {
+            geomChild.setAttribute('material','color:red');
+          }
+        }
       }
       function getOriginalColor(obj){ return obj.dataset?.baseColor || 'gray'; }
 
       window.deleteSelectedObject = ()=>{
         if(!selectedObject) return;
         const sceneEl = document.querySelector('a-scene');
-        if (selectedObject.parentElement && selectedObject.parentElement.hasAttribute('gps-new-entity-place')){
-          sceneEl.removeChild(selectedObject.parentElement);
-        } else {
+
+        if (selectedObject.hasAttribute('gps-new-entity-place')){
+          removeRecordById(selectedObject.id);
           sceneEl.removeChild(selectedObject);
+        } else {
+          const parent = selectedObject.parentElement;
+          if (parent && parent.hasAttribute('gps-new-entity-place')) {
+            removeRecordById(parent.id);
+            sceneEl.removeChild(parent);
+          } else {
+            sceneEl.removeChild(selectedObject);
+          }
         }
         selectedObject=null; updateObjectCount();
       };
 
       window.clearAllObjects = ()=>{
         const sceneEl = document.querySelector('a-scene');
+        clearAllRecords();
+        // Remove all GPS anchors and any loose non-anchor objects
+        sceneEl.querySelectorAll("[gps-new-entity-place]").forEach(n=>sceneEl.removeChild(n));
         sceneEl.querySelectorAll("a-box, a-sphere, a-cylinder, a-entity[id^='object-']").forEach(n=>{
-          if(n.parentElement===sceneEl) sceneEl.removeChild(n);
-          else if(n.parentElement?.hasAttribute('gps-new-entity-place')) sceneEl.removeChild(n.parentElement);
+          if (!n.hasAttribute('gps-new-entity-place') && n.parentElement===sceneEl) sceneEl.removeChild(n);
         });
         selectedObject=null; updateObjectCount();
       };
 
       function updateObjectCount(){
         const sceneEl = document.querySelector('a-scene');
-        const count = sceneEl.querySelectorAll("a-entity[id^='object-']").length;
+        const count = sceneEl.querySelectorAll("[gps-new-entity-place]").length;
         document.getElementById('object-count').textContent = count;
       }
+
+      // ---------- Restore persisted GPS pins on load ----------
+      window.addEventListener('DOMContentLoaded', ()=>{
+        if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+          console.warn('Camera + geolocation require HTTPS (or localhost) on mobile.');
+        }
+
+        const recs = loadRecords();
+        // Rebuild each GPS anchor and give it the same id for future deletes
+        recs.forEach(rec => {
+          const anchor = addAtLatLng(rec.lat, rec.lon, rec.type);
+          anchor.setAttribute('id', rec.id);
+        });
+        updateObjectCount();
+      });
 
       // ---------- Input handlers ----------
       const sceneEl = document.querySelector('a-scene');
