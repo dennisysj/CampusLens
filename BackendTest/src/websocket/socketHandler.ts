@@ -8,12 +8,6 @@ const app = express();
 const server = http.createServer(app);
 const io = new SocketIOServer(server);
 
-server.listen(3000, () => {
-  console.log('Server listening on port 3000');
-});
-//ws://localhost:3000/socket.io/?EIO=4&transport=websocket
-// WORKS to download, fails if i send from postman
-
 interface ClientInfo {
   id: string;
   connectedAt: Date;
@@ -247,6 +241,7 @@ export const setupWebSocket = (io: SocketIOServer): ClientManager => {
       try {
         const client = connectedClients.get(socket.id);
         if (!client) return;
+        console.log('Received user_position from', socket.id, data);
 
         // Triangulate the coordinate
         const refinedPosition = await triangulateCoordinate(data.lat, data.lon);
@@ -373,3 +368,10 @@ export const setupWebSocket = (io: SocketIOServer): ClientManager => {
   console.log('🔌 WebSocket server initialized');
   return clientManager;
 };
+
+// VV BOTTLENECKER --- IGNORE ---
+// server.listen(3000, () => {
+//   console.log('Server listening on port 3000');
+// });
+//ws://localhost:3000/socket.io/?EIO=4&transport=websocket
+// WORKS to download, fails if i send from postman

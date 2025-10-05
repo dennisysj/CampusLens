@@ -3,6 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
+import { setupWebSocket } from './websocket/socketHandler';
+
 
 // Load environment variables
 dotenv.config();
@@ -25,7 +27,7 @@ app.use(express.json());
 // Routes
 app.get('/', (req: Request, res: Response) => {
   res.json({
-    message: '🚀 Simple Express.js TypeScript Server with Supabase!',
+    message: 'Simple Express.js TypeScript Server with Felipes personal database...',
     timestamp: new Date().toISOString(),
     endpoints: {
       health: '/health',
@@ -55,46 +57,47 @@ app.get('/hello', (req: Request, res: Response) => {
 // Users endpoint with PostgreSQL
 
 
-
 // WebSocket connection handling
-io.on('connection', (socket) => {
-  console.log(`🔌 Client connected: ${socket.id}`);
+// io.on('connection', (socket) => {
+//   console.log(`🔌 Client connected: ${socket.id}`);
   
-  // Send welcome message
-  socket.emit('welcome', {
-    message: 'Welcome to the WebSocket server! 🎉',
-    clientId: socket.id,
-    timestamp: new Date().toISOString()
-  });
+//   // Send welcome message
+//   socket.emit('welcome', {
+//     message: 'Welcome to the WebSocket server!',
+//     clientId: socket.id,
+//     timestamp: new Date().toISOString(),
+//   });
+const clientManager = setupWebSocket(io);
+
 
   // Handle ping/pong
-  socket.on('ping', (data) => {
-    socket.emit('pong', {
-      message: 'Pong! 🏓',
-      timestamp: new Date().toISOString(),
-      data: data
-    });
-  });
+  // socket.on('ping', (data) => {
+  //   socket.emit('pong', {
+  //     message: 'Pong! 🏓',
+  //     timestamp: new Date().toISOString(),
+  //     data: data
+  //   });
+  // });
 
   // Handle chat messages
-  socket.on('chat_message', (data) => {
-    const message = {
-      id: socket.id,
-      username: data.username || 'Anonymous',
-      message: data.message,
-      timestamp: new Date().toISOString()
-    };
+  // socket.on('chat_message', (data) => {
+  //   const message = {
+  //     id: socket.id,
+  //     username: data.username || 'Anonymous',
+  //     message: data.message,
+  //     timestamp: new Date().toISOString()
+  //   };
     
     // Broadcast to all clients
-    io.emit('chat_message', message);
-    console.log(`💬 Chat message from ${socket.id}: ${data.message}`);
-  });
+  //   io.emit('chat_message', message);
+  //   console.log(`💬 Chat message from ${socket.id}: ${data.message}`);
+  // });
 
-  // Handle disconnection
-  socket.on('disconnect', (reason) => {
-    console.log(`🔌 Client disconnected: ${socket.id}, reason: ${reason}`);
-  });
-});
+  // // Handle disconnection
+  // socket.on('disconnect', (reason) => {
+  //   console.log(`🔌 Client disconnected: ${socket.id}, reason: ${reason}`);
+  // });
+// });
 
 
 
