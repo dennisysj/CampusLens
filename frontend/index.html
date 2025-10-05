@@ -16,9 +16,38 @@
       .instructions{position:fixed;bottom:10px;left:10px;z-index:100;background:rgba(0,0,0,.7);padding:6px;border-radius:5px;color:#fff;font-family:Arial,sans-serif;font-size:.9em}
       .row{margin-top:8px}
       input[type="number"]{width:130px;border-radius:4px;border:none;padding:6px;margin-right:6px}
+      
+      /* Full-screen AR camera */
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        overflow: hidden !important;
+      }
+      
+      a-scene {
+        width: 100vw !important;
+        height: 100vh !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        z-index: 1 !important;
+      }
+      
+      /* AR.js video element */
+      a-scene video {
+        width: 100vw !important;
+        height: 100vh !important;
+        object-fit: cover !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        z-index: -1 !important;
+      }
     </style>
   </head>
-  <body style="margin:0; overflow:hidden;">
+  <body style="margin:0; padding:0; overflow:hidden; width:100vw; height:100vh;">
     <!-- UI -->
     <div class="ui-panel">
       <div>
@@ -53,14 +82,12 @@
     <a-scene
       embedded
       vr-mode-ui="enabled:false"
-      renderer="logarithmicDepthBuffer:true"
-      arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: true; detectionMode: mono_and_matrix; matrixCodeType: 3x3;">
+      renderer="logarithmicDepthBuffer:true; alpha: true;"
+      arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: true; sourceWidth:1280; sourceHeight:960; displayWidth: 1280; displayHeight: 960;"
+      style="width: 100vw; height: 100vh; position: fixed; top: 0; left: 0;">
 
-      <!-- Location-enabled camera (new API) -->
-      <a-camera id="cam"
-        gps-new-camera="gpsMinDistance: 5; positionMinAccuracy: 100"
-        arjs-device-orientation-controls="smoothingFactor:0.1"
-        wasd-controls="enabled: false">
+      <!-- Basic camera without GPS -->
+      <a-camera id="cam" position="0 0 0" look-controls="enabled: false" wasd-controls="enabled: false">
       </a-camera>
 
       <!-- (Optional) invisible “edit plane” so your existing raycaster can hit something.
@@ -71,11 +98,6 @@
       <!-- Mouse cursor for desktop debugging -->
       <a-entity cursor="rayOrigin: mouse"
                 raycaster="objects: a-box, a-sphere, a-cylinder, a-entity[id^='object-']"></a-entity>
-
-      <!-- Test AR marker for debugging -->
-      <a-marker-camera preset="hiro">
-        <a-box position="0 0.5 0" material="color: yellow;"></a-box>
-      </a-marker-camera>
     </a-scene>
 
     <!-- iOS motion permission -->
@@ -261,11 +283,32 @@
           alert('Camera access requires HTTPS. Please use https:// or localhost');
         }
 
+        // Wait for scene to load
+        scene.addEventListener('loaded', function() {
+          console.log('A-Frame scene loaded');
+        });
+
         // Handle AR.js initialization
         scene.addEventListener('arjs-video-loaded', function() {
           console.log('AR.js video loaded successfully');
           document.querySelector('.instructions').textContent = 'Camera ready! Tap to place objects.';
           cameraPermBtn.style.display = 'none';
+          
+          // Force video to fill entire screen
+          const videos = document.querySelectorAll('video');
+          console.log('Found ' + videos.length + ' video elements');
+          videos.forEach((video, index) => {
+            console.log('Video ' + index + ':', video);
+            video.style.width = '100vw';
+            video.style.height = '100vh';
+            video.style.objectFit = 'cover';
+            video.style.position = 'fixed';
+            video.style.top = '0';
+            video.style.left = '0';
+            video.style.zIndex = '-1';
+            video.play();
+            console.log('Video ' + index + ' configured and playing');
+          });
         });
 
         scene.addEventListener('arjs-video-error', function() {
@@ -292,17 +335,49 @@
           }
         };
 
-        // Auto-request camera permissions
+        // Auto-request camera permissions and force video display
         setTimeout(() => {
           if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            navigator.mediaDevices.getUserMedia({ video: true })
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
               .then(function(stream) {
                 console.log('Camera permission granted automatically');
                 cameraPermBtn.style.display = 'none';
+                document.querySelector('.instructions').textContent = 'Camera permission granted. Initializing AR...';
+                
+                // Force video display immediately and repeatedly
+                const forceVideoDisplay = () => {
+                  const videos = document.querySelectorAll('video');
+                  console.log('Forcing video display. Found ' + videos.length + ' videos');
+                  
+                  videos.forEach((video, index) => {
+                    video.style.width = '100vw';
+                    video.style.height = '100vh';
+                    video.style.objectFit = 'cover';
+                    video.style.position = 'fixed';
+                    video.style.top = '0';
+                    video.style.left = '0';
+                    video.style.zIndex = '-1';
+                    video.style.display = 'block';
+                    video.style.visibility = 'visible';
+                    
+                    // Make sure video is playing
+                    if (video.paused) {
+                      video.play().catch(e => console.log('Play error:', e));
+                    }
+                    console.log('Video ' + index + ' display forced');
+                  });
+                };
+                
+                // Call multiple times to ensure it works
+                setTimeout(forceVideoDisplay, 1000);
+                setTimeout(forceVideoDisplay, 2000);
+                setTimeout(forceVideoDisplay, 3000);
+                setTimeout(forceVideoDisplay, 5000);
               })
               .catch(function(error) {
                 console.log('Camera permission not granted automatically, showing button');
                 cameraPermBtn.style.display = 'block';
+                document.querySelector('.instructions').textContent = 'Camera permission needed. Click "Enable Camera" button.';
               });
           }
         }, 1000);
