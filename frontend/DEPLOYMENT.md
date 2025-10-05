@@ -29,6 +29,38 @@ This frontend is now ready for deployment to Vercel.
 5. Vercel will automatically detect the Node.js configuration
 6. Click "Deploy"
 
+## Troubleshooting Deployment Issues
+
+If deployment fails, try these solutions in order:
+
+### Option 1: Use Static Deployment (Recommended)
+Replace `vercel.json` with `vercel-simple.json`:
+```bash
+cd frontend
+mv vercel.json vercel.json.backup
+mv vercel-simple.json vercel.json
+vercel --prod
+```
+
+### Option 2: Use API Route Deployment
+The current `vercel.json` uses API routes. If this fails, check:
+- Ensure `api/index.js` exists
+- Check Vercel logs for specific error messages
+
+### Option 3: Manual Configuration
+In Vercel dashboard:
+1. Go to Project Settings
+2. Under "Build & Development Settings":
+   - Framework Preset: "Other"
+   - Build Command: `echo "No build required"`
+   - Output Directory: Leave empty
+   - Install Command: `npm install`
+
+### Common Issues:
+- **Build timeout**: Use static deployment (`vercel-simple.json`)
+- **Module not found**: Ensure `package.json` has correct dependencies
+- **Route conflicts**: Check `vercel.json` routes configuration
+
 ## Configuration Files Added
 
 - `package.json` - Node.js dependencies and scripts
