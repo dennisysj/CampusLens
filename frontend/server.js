@@ -11,7 +11,7 @@ app.get('/', (req, res) => {
 });
 
 // Handle all other routes by serving the main HTML (for SPA behavior)
-app.get('*', (req, res) => {
+app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
