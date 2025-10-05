@@ -1,5 +1,6 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { AppDataSource } from '../services/typeorm';
+import { computeAssetPlacementVector } from '../services/reverseVectorAlgorithm';
 import Decimal from 'decimal.js';
 
 interface ClientInfo {
@@ -12,7 +13,7 @@ interface ClientInfo {
   };
   initialPosition?: {
     refined_lon: number;
-    refined_lat: number;
+    refined_lat: number;  
   };
   state: 'accept' | 'ok' | 'off_boundaries';
 }
@@ -91,46 +92,50 @@ interface AssetData {
   longitude: number;
   altitude: number;
   creator_altitude: number;
+  creator_latitude: number;
+  creator_longitude: number;
   vector_position: { x: number; y: number; z: number };
+  vector_relative?: { e: number; n: number; u: number }; // Computed user→asset vector
   angulation: { x: number; y: number; z: number };
   distance_meters: number;
+  coordinates?: number[]; // Original coordinates array
 }
 
-// Query database for assets close to user location
+// Query database for assets close to user location from RawFrontend table
 const getNearbyAssets = async (lat: number, lon: number, radiusMeters: number = 100): Promise<AssetData[]> => {
   try {
-    // TODO: Replace this with your custom database query
-    // This is a placeholder implementation using the existing locations table
+    // Query RawFrontend table for nearby assets with creator position and original vector
     const query = `
       SELECT 
-        l.id,
-        l.name,
-        l.description,
-        l.category,
+        r.objectid as id,
+        'Asset-' || r.objectid as name,
+        'Placed asset' as description,
+        'ar_object' as category,
         'placeholder_glb_data' as glb_data,
-        ST_Y(l.coordinates) as latitude,
-        ST_X(l.coordinates) as longitude,
-        l.floor_level as altitude,
-        l.floor_level as creator_altitude,
-        '{"x": 0, "y": 0, "z": 0}' as vector_position,
-        '{"x": 0, "y": 0, "z": 0}' as angulation,
+        r.objectlatitude as latitude,
+        r.objectlongitude as longitude,
+        COALESCE(r.coordinates[3], 370) as altitude,
+        r.userlatitude as creator_latitude,
+        r.userlongitude as creator_longitude,
+        r.coordinates,
         ST_Distance(
-          ST_Transform(l.coordinates, 3857),
+          ST_Transform(r.object_location, 3857),
           ST_Transform(ST_SetSRID(ST_MakePoint($2, $1), 4326), 3857)
         ) as distance_meters
-      FROM locations l
-      WHERE ST_DWithin(
-        ST_Transform(l.coordinates, 3857),
-        ST_Transform(ST_SetSRID(ST_MakePoint($2, $1), 4326), 3857),
-        $3
-      )
+      FROM public.rawfrontend r
+      WHERE r.object_location IS NOT NULL
+        AND ST_DWithin(
+          ST_Transform(r.object_location, 3857),
+          ST_Transform(ST_SetSRID(ST_MakePoint($2, $1), 4326), 3857),
+          $3
+        )
       ORDER BY distance_meters
       LIMIT 10
     `;
 
     const result = await AppDataSource.query(query, [lat, lon, radiusMeters]);
 
-    // Parse JSON fields and return formatted assets
+    // Parse and format assets with creator position and original vector
     return result.map((asset: any) => ({
       id: asset.id,
       name: asset.name,
@@ -139,15 +144,17 @@ const getNearbyAssets = async (lat: number, lon: number, radiusMeters: number = 
       glb_data: asset.glb_data,
       latitude: parseFloat(asset.latitude),
       longitude: parseFloat(asset.longitude),
-      altitude: parseFloat(asset.altitude) || 0,
-      creator_altitude: parseFloat(asset.creator_altitude) || 0,
-      vector_position: typeof asset.vector_position === 'string' 
-        ? JSON.parse(asset.vector_position) 
-        : asset.vector_position || { x: 0, y: 0, z: 0 },
-      angulation: typeof asset.angulation === 'string' 
-        ? JSON.parse(asset.angulation) 
-        : asset.angulation || { x: 0, y: 0, z: 0 },
-      distance_meters: parseFloat(asset.distance_meters)
+      altitude: parseFloat(asset.altitude) || 370,
+      creator_altitude: 370, // Default altitude
+      creator_latitude: parseFloat(asset.creator_latitude),
+      creator_longitude: parseFloat(asset.creator_longitude),
+      // Original vector from creator to asset (stored in coordinates array)
+      // coordinates array is [lat, lon, h] but we need [e, n, u]
+      // For now, we'll compute it from creator and asset positions
+      vector_position: { x: 0, y: 0, z: 0 }, // Will be computed
+      angulation: { x: 0, y: 0, z: 0 },
+      distance_meters: parseFloat(asset.distance_meters),
+      coordinates: asset.coordinates // Store for later computation
     }));
 
   } catch (error) {
@@ -156,7 +163,7 @@ const getNearbyAssets = async (lat: number, lon: number, radiusMeters: number = 
   }
 };
 
-// RenderElements function - now queries database for nearby assets
+// RenderElements function - queries database and computes relative vectors
 const RenderElements = async (clientId: string, position: {refined_lon: number, refined_lat: number}) => {
   console.log(`🎯 RenderElements called for client ${clientId} at position:`, position);
   
@@ -166,12 +173,51 @@ const RenderElements = async (clientId: string, position: {refined_lon: number, 
     
     console.log(`📍 Found ${nearbyAssets.length} nearby assets for client ${clientId}`);
     
-    // Log asset details for debugging
-    nearbyAssets.forEach(asset => {
-      console.log(`  - ${asset.name} (${asset.category}) - ${asset.distance_meters.toFixed(2)}m away`);
+    // Compute relative vector for each asset using computeAssetPlacementVector
+    const assetsWithVectors = nearbyAssets.map(asset => {
+      try {
+        // We need the original creator→asset vector
+        // Since we don't have it stored directly, we compute it from positions
+        // The vector_position in database is actually the ENU offset used when creating
+        // For now, we'll use a simple approach: compute user→asset directly
+        
+        // Extract original vector from coordinates if available
+        // coordinates array might be [lat, lon, h] but we need [e, n, u]
+        // Let's use a simple ENU calculation as fallback
+        const originalVector = asset.vector_position || { x: 0, y: 0, z: 0 };
+        
+        // Compute the relative vector from current user to asset
+        const vectorRelative = computeAssetPlacementVector(
+          { 
+            lat: asset.creator_latitude, 
+            lon: asset.creator_longitude, 
+            h: asset.creator_altitude 
+          }, // Creator position (original user)
+          { 
+            lat: position.refined_lat, 
+            lon: position.refined_lon, 
+            h: 370 
+          }, // Current user position
+          { 
+            e: originalVector.x, 
+            n: originalVector.y, 
+            u: originalVector.z 
+          } // Original creator→asset vector
+        );
+        
+        console.log(`  - ${asset.name}: dist=${asset.distance_meters.toFixed(2)}m, vec=(${vectorRelative.e.toFixed(2)}, ${vectorRelative.n.toFixed(2)}, ${vectorRelative.u.toFixed(2)})`);
+        
+        return {
+          ...asset,
+          vector_relative: vectorRelative
+        };
+      } catch (error) {
+        console.error(`Error computing vector for asset ${asset.id}:`, error);
+        return asset;
+      }
     });
     
-    return nearbyAssets;
+    return assetsWithVectors;
   } catch (error) {
     console.error(`❌ Error in RenderElements for client ${clientId}:`, error);
     return [];
