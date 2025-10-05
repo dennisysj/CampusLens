@@ -3,8 +3,8 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Supabase PostgreSQL connection string
-const DATABASE_URL = 'postgresql://postgres:Casa8301@db.ujbhmfujhjiuapvegstg.supabase.co:5432/postgres';
+// Local CampusLens PostgreSQL connection string
+const DATABASE_URL = 'postgresql://campuslens:campuslens123@localhost:15432/campuslens';
 
 // TypeORM DataSource configuration
 export const AppDataSource = new DataSource({
@@ -13,7 +13,7 @@ export const AppDataSource = new DataSource({
   ssl: {
     rejectUnauthorized: false
   },
-  entities: [__dirname + '/entities/*.ts'],
+  entities: [__dirname + '/../entities/*.ts'],
   synchronize: true, // Auto-create tables
   logging: false,
 });

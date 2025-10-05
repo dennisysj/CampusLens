@@ -6,8 +6,41 @@ interface ClientInfo {
   userAgent?: string;
 }
 
-export const setupWebSocket = (io: SocketIOServer): void => {
+interface ClientManager {
+  sendUpdateToClient: (clientId: string, event: string, data: any) => boolean;
+  getConnectedClients: () => string[];
+  isClientConnected: (clientId: string) => boolean;
+}
+
+export const setupWebSocket = (io: SocketIOServer): ClientManager => {
   const connectedClients = new Map<string, ClientInfo>();
+  const clientSockets = new Map<string, Socket>();
+
+  // Client Management Methods
+  const clientManager: ClientManager = {
+    // Send update to specific client
+    sendUpdateToClient: (clientId: string, event: string, data: any): boolean => {
+      const socket = clientSockets.get(clientId);
+      if (socket && socket.connected) {
+        socket.emit(event, data);
+        console.log(`📤 Sent ${event} to client ${clientId}`);
+        return true;
+      }
+      console.warn(`⚠️ Client ${clientId} not found or disconnected`);
+      return false;
+    },
+
+    // Get list of connected client IDs
+    getConnectedClients: (): string[] => {
+      return Array.from(connectedClients.keys());
+    },
+
+    // Check if specific client is connected
+    isClientConnected: (clientId: string): boolean => {
+      const socket = clientSockets.get(clientId);
+      return socket ? socket.connected : false;
+    }
+  };
 
   io.on('connection', (socket: Socket) => {
     const clientInfo: ClientInfo = {
@@ -17,22 +50,16 @@ export const setupWebSocket = (io: SocketIOServer): void => {
     };
 
     connectedClients.set(socket.id, clientInfo);
+    clientSockets.set(socket.id, socket);
 
     console.log(`🔌 Client connected: ${socket.id}`);
     console.log(`📊 Total connected clients: ${connectedClients.size}`);
 
-    // Send welcome message
+    // Send welcome message to the specific client
     socket.emit('welcome', {
       message: 'Welcome to the WebSocket server! 🎉',
       clientId: socket.id,
       timestamp: new Date().toISOString()
-    });
-
-    // Broadcast to all clients that someone joined
-    socket.broadcast.emit('user_joined', {
-      clientId: socket.id,
-      timestamp: new Date().toISOString(),
-      totalClients: connectedClients.size
     });
 
     // Handle ping/pong for connection health
@@ -44,45 +71,13 @@ export const setupWebSocket = (io: SocketIOServer): void => {
       });
     });
 
-    // Handle chat messages
-    socket.on('chat_message', (data: { message: string; username?: string }) => {
-      const message = {
-        id: socket.id,
-        username: data.username || 'Anonymous',
-        message: data.message,
-        timestamp: new Date().toISOString()
-      };
-
-      // Broadcast to all clients
-      io.emit('chat_message', message);
-      console.log(`💬 Chat message from ${socket.id}: ${data.message}`);
-    });
-
-    // Handle custom events
-    socket.on('custom_event', (data: any) => {
-      console.log(`📨 Custom event from ${socket.id}:`, data);
-      
-      // Echo back to sender
-      socket.emit('custom_event_response', {
-        originalData: data,
-        processedAt: new Date().toISOString(),
-        clientId: socket.id
-      });
-    });
-
     // Handle disconnection
     socket.on('disconnect', (reason: string) => {
       connectedClients.delete(socket.id);
+      clientSockets.delete(socket.id);
       
       console.log(`🔌 Client disconnected: ${socket.id}, reason: ${reason}`);
       console.log(`📊 Total connected clients: ${connectedClients.size}`);
-
-      // Broadcast to remaining clients
-      socket.broadcast.emit('user_left', {
-        clientId: socket.id,
-        timestamp: new Date().toISOString(),
-        totalClients: connectedClients.size
-      });
     });
 
     // Handle errors
@@ -91,14 +86,6 @@ export const setupWebSocket = (io: SocketIOServer): void => {
     });
   });
 
-  // Optional: Send periodic updates to all clients
-  setInterval(() => {
-    io.emit('server_status', {
-      timestamp: new Date().toISOString(),
-      connectedClients: connectedClients.size,
-      uptime: process.uptime()
-    });
-  }, 30000); // Every 30 seconds
-
   console.log('🔌 WebSocket server initialized');
+  return clientManager;
 };
